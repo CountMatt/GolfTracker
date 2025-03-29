@@ -1,3 +1,5 @@
+
+
 // File: Sources/Controllers/StatisticsCalculator.swift
 import Foundation
 
@@ -13,34 +15,24 @@ class StatisticsCalculator {
         var totalScoreOverall: Int = 0
         var totalHolesOverall: Int = 0
         var totalPuttsOverall: Int = 0
-
         var totalFairwayOpportunitiesOverall: Int = 0
         var totalFairwaysHitOverall: Int = 0
         var totalFairwaysMissedLeft: Int = 0
         var totalFairwaysMissedRight: Int = 0
-
         var totalGIROpportunitiesOverall: Int = 0
         var totalGIRsHitOverall: Int = 0
-
-        // Par 3 Stats
         var scoreSumPar3: Int = 0
         var puttsSumPar3: Int = 0
         var girSumPar3: Int = 0
         var holeCountPar3: Int = 0
-
-        // Par 4 Stats
         var scoreSumPar4: Int = 0
         var puttsSumPar4: Int = 0
         var girSumPar4: Int = 0
         var holeCountPar4: Int = 0
-
-        // Par 5 Stats
         var scoreSumPar5: Int = 0
         var puttsSumPar5: Int = 0
         var girSumPar5: Int = 0
         var holeCountPar5: Int = 0
-
-        // Putting Breakdown Stats
         var puttSumOnGIR: Int = 0
         var holeCountOnGIR: Int = 0
         var puttSumOffGIR: Int = 0
@@ -51,22 +43,25 @@ class StatisticsCalculator {
 
         // --- Process Rounds and Holes ---
         for round in rounds {
-            // Accumulate per-round stats for trends
-            statistics.roundsWithScoreByDate.append(DateScorePair(date: round.date, score: round.totalScore))
+            // Accumulate per-round stats for trends (Includes scoreRelativeToPar now)
+            statistics.roundsWithScoreByDate.append(
+                DateScorePair(date: round.date,
+                              score: round.totalScore,
+                              scoreRelativeToPar: round.scoreRelativeToPar) // Populate new field
+            )
             statistics.roundsWithPuttsByDate.append(DatePuttsPair(date: round.date, putts: round.totalPutts))
             statistics.roundsWithGIRByDate.append(DatePercentPair(date: round.date, percentage: round.girPercentage))
             statistics.roundsWithFairwaysByDate.append(DatePercentPair(date: round.date, percentage: round.fairwayPercentage))
 
+            // Accumulate hole-by-hole stats
             for hole in round.holes {
                 totalHolesOverall += 1
                 totalScoreOverall += hole.score
                 totalPuttsOverall += hole.putts
 
                 // Overall GIR
-                totalGIROpportunitiesOverall += 1 // Every hole is an opportunity
-                if hole.isGIR {
-                    totalGIRsHitOverall += 1
-                }
+                totalGIROpportunitiesOverall += 1
+                if hole.isGIR { totalGIRsHitOverall += 1 }
 
                 // Overall Fairway & Driving Breakdown (Only Par 4s/5s)
                 if !hole.isPar3 {
@@ -75,51 +70,26 @@ class StatisticsCalculator {
                         if hit {
                             totalFairwaysHitOverall += 1
                         } else {
-                            if hole.fairwayMissDirection == .left {
-                                totalFairwaysMissedLeft += 1
-                            } else if hole.fairwayMissDirection == .right {
-                                totalFairwaysMissedRight += 1
-                            }
-                            // Ignore .none misses if fairwayHit is explicitly false
+                            if hole.fairwayMissDirection == .left { totalFairwaysMissedLeft += 1 }
+                            else if hole.fairwayMissDirection == .right { totalFairwaysMissedRight += 1 }
                         }
                     }
                 }
 
                 // Stats by Par Type
                 switch hole.par {
-                case 3:
-                    holeCountPar3 += 1
-                    scoreSumPar3 += hole.score
-                    puttsSumPar3 += hole.putts
-                    if hole.isGIR { girSumPar3 += 1 } // GIR on Par 3 is hitting green
-                case 4:
-                    holeCountPar4 += 1
-                    scoreSumPar4 += hole.score
-                    puttsSumPar4 += hole.putts
-                    if hole.isGIR { girSumPar4 += 1 }
-                case 5:
-                    holeCountPar5 += 1
-                    scoreSumPar5 += hole.score
-                    puttsSumPar5 += hole.putts
-                    if hole.isGIR { girSumPar5 += 1 }
-                default:
-                    break // Ignore invalid par numbers
+                case 3: holeCountPar3+=1; scoreSumPar3+=hole.score; puttsSumPar3+=hole.putts; if hole.isGIR { girSumPar3+=1 }
+                case 4: holeCountPar4+=1; scoreSumPar4+=hole.score; puttsSumPar4+=hole.putts; if hole.isGIR { girSumPar4+=1 }
+                case 5: holeCountPar5+=1; scoreSumPar5+=hole.score; puttsSumPar5+=hole.putts; if hole.isGIR { girSumPar5+=1 }
+                default: break
                 }
 
                 // Putting Breakdown
-                if hole.isGIR {
-                    holeCountOnGIR += 1
-                    puttSumOnGIR += hole.putts
-                } else {
-                    holeCountOffGIR += 1
-                    puttSumOffGIR += hole.putts
-                }
+                if hole.isGIR { holeCountOnGIR+=1; puttSumOnGIR+=hole.putts }
+                else { holeCountOffGIR+=1; puttSumOffGIR+=hole.putts }
 
-                if hole.putts == 1 {
-                    onePuttCount += 1
-                } else if hole.putts >= 3 {
-                    threePuttPlusCount += 1
-                }
+                if hole.putts == 1 { onePuttCount+=1 }
+                else if hole.putts >= 3 { threePuttPlusCount+=1 }
             } // End hole loop
         } // End round loop
 
@@ -127,12 +97,11 @@ class StatisticsCalculator {
         // --- Calculate Averages and Percentages ---
 
         // Overall Stats
-        statistics.averageScore = totalHolesOverall > 0 ? Double(totalScoreOverall) / totalRounds(forHoleCount: 18, from: rounds) : 0 // Per 18 equiv
+        statistics.averageScore = totalHolesOverall > 0 ? Double(totalScoreOverall) / totalRounds(forHoleCount: 18, from: rounds) : 0
         statistics.girPercentage = totalGIROpportunitiesOverall > 0 ? (Double(totalGIRsHitOverall) / Double(totalGIROpportunitiesOverall) * 100.0) : 0
         statistics.fairwayHitPercentage = totalFairwayOpportunitiesOverall > 0 ? (Double(totalFairwaysHitOverall) / Double(totalFairwayOpportunitiesOverall) * 100.0) : 0
         statistics.averagePuttsPerHole = totalHolesOverall > 0 ? Double(totalPuttsOverall) / Double(totalHolesOverall) : 0
         statistics.averagePuttsPerRound = statistics.totalRounds > 0 ? Double(totalPuttsOverall) / Double(statistics.totalRounds) : 0
-
 
         // Performance by Par
         statistics.avgScorePar3 = holeCountPar3 > 0 ? Double(scoreSumPar3) / Double(holeCountPar3) : 0
@@ -142,8 +111,6 @@ class StatisticsCalculator {
         statistics.avgPuttsPar4 = holeCountPar4 > 0 ? Double(puttsSumPar4) / Double(holeCountPar4) : 0
         statistics.avgPuttsPar5 = holeCountPar5 > 0 ? Double(puttsSumPar5) / Double(holeCountPar5) : 0
         statistics.girPercentagePar3 = holeCountPar3 > 0 ? (Double(girSumPar3) / Double(holeCountPar3) * 100.0) : 0
-        // Note: GIR for Par 4/5 is handled by the overall GIR calculation if needed elsewhere
-
 
         // Putting Breakdown
         statistics.avgPuttsOnGIR = holeCountOnGIR > 0 ? Double(puttSumOnGIR) / Double(holeCountOnGIR) : 0
@@ -165,18 +132,17 @@ class StatisticsCalculator {
              statistics.fairwaysMissedRightPercentage = 0
          }
 
-        // Strokes Gained - Placeholders: Calculation requires external benchmarks
+        // Strokes Gained - Placeholders
         // statistics.strokesGainedTotal = calculateStrokesGained(...)
 
-        // Add total counts for potential display
+        // Add total counts
         statistics.totalHolesPlayed = totalHolesOverall
         statistics.totalPar3sPlayed = holeCountPar3
         statistics.totalPar4sPlayed = holeCountPar4
         statistics.totalPar5sPlayed = holeCountPar5
         statistics.totalFairwayOpportunities = totalFairwayOpportunitiesOverall
 
-
-        // Sort date-based arrays chronologically
+        // --- Sort Trend Data ---
         statistics.roundsWithScoreByDate.sort { $0.date < $1.date }
         statistics.roundsWithPuttsByDate.sort { $0.date < $1.date }
         statistics.roundsWithGIRByDate.sort { $0.date < $1.date }
@@ -188,9 +154,12 @@ class StatisticsCalculator {
     // Helper method to convert 9-hole rounds to equivalent 18-hole rounds for scoring avg
     private func totalRounds(forHoleCount standardCount: Int, from rounds: [Round]) -> Double {
         var equivalentRounds = 0.0
+        guard standardCount > 0 else { return Double(rounds.count) } // Prevent division by zero
         for round in rounds {
             equivalentRounds += Double(round.holes.count) / Double(standardCount)
         }
-        return equivalentRounds > 0 ? equivalentRounds : 1.0 // Avoid division by zero if only partial rounds exist
+        // Ensure we don't return 0 if there are only partial rounds, maybe return 1? Or number of actual rounds?
+        // Let's return number of actual rounds if equivalent is 0 but rounds exist.
+        return equivalentRounds > 0 ? equivalentRounds : Double(rounds.count)
     }
 }

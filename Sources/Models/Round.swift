@@ -1,65 +1,28 @@
 // File: Sources/Models/Round.swift
 import Foundation
 
-struct Round: Identifiable, Codable {
+// Added Equatable conformance
+struct Round: Identifiable, Codable, Equatable {
     var id = UUID()
     var date: Date
     var courseName: String = "My Course"
-    var holes: [Hole]
+    var holes: [Hole] // Assumes Hole is already Equatable
     var notes: String = ""
 
-    var isNineHoles: Bool {
-        return holes.count <= 9
-    }
+    // --- Computed Properties (Keep as before) ---
+    var isNineHoles: Bool { holes.count <= 9 }
+    var totalScore: Int { holes.reduce(0) { $0 + $1.score } }
+    var totalPar: Int { holes.reduce(0) { $0 + $1.par } }
+    var scoreRelativeToPar: Int { totalScore - totalPar }
+    var totalPutts: Int { holes.reduce(0) { $0 + $1.putts } }
+    var greensInRegulation: Int { holes.reduce(0) { $0 + ($1.isGIR ? 1 : 0) } }
+    var girOpportunities: Int { holes.count }
+    var girPercentage: Double { guard girOpportunities > 0 else { return 0.0 }; return (Double(greensInRegulation) / Double(girOpportunities)) * 100.0 }
+    var fairwaysHit: Int { holes.reduce(0) { $0 + ($1.fairwayHit == true ? 1 : 0) } }
+    var fairwayOpportunities: Int { holes.reduce(0) { $0 + (!$1.isPar3 ? 1 : 0) } }
+    var fairwayPercentage: Double { guard fairwayOpportunities > 0 else { return 0.0 }; return (Double(fairwaysHit) / Double(fairwayOpportunities)) * 100.0 }
 
-    var totalScore: Int {
-        return holes.reduce(0) { $0 + $1.score }
-    }
-
-    var totalPar: Int {
-        return holes.reduce(0) { $0 + $1.par }
-    }
-
-    var scoreRelativeToPar: Int {
-        return totalScore - totalPar
-    }
-
-    // --- NEW: Computed Properties for Round-Specific Stats ---
-
-    var totalPutts: Int {
-        holes.reduce(0) { $0 + $1.putts }
-    }
-
-    var greensInRegulation: Int {
-        holes.reduce(0) { $0 + ($1.isGIR ? 1 : 0) }
-    }
-
-    var girOpportunities: Int {
-        holes.count // Every hole is a GIR opportunity
-    }
-
-    var girPercentage: Double {
-        guard girOpportunities > 0 else { return 0.0 }
-        return (Double(greensInRegulation) / Double(girOpportunities)) * 100.0
-    }
-
-    var fairwaysHit: Int {
-        holes.reduce(0) { $0 + ($1.fairwayHit == true ? 1 : 0) }
-    }
-
-    var fairwayOpportunities: Int {
-        // Only count Par 4s and Par 5s as fairway opportunities
-        holes.reduce(0) { $0 + (!$1.isPar3 ? 1 : 0) }
-    }
-
-    var fairwayPercentage: Double {
-        guard fairwayOpportunities > 0 else { return 0.0 } // Avoid division by zero
-        return (Double(fairwaysHit) / Double(fairwayOpportunities)) * 100.0
-    }
-
-    // --- End New Properties ---
-
-
+    // --- Static Factory Method (Keep as before) ---
     static func createNew(holeCount: Int) -> Round {
         var newHoles: [Hole] = []
         for i in 1...holeCount {
@@ -70,4 +33,8 @@ struct Round: Identifiable, Codable {
         }
         return Round(date: Date(), holes: newHoles)
     }
+
+    // Note: Because all stored properties (UUID, Date, String, [Hole])
+    // are Equatable, Swift synthesizes the == operator automatically.
+    // No need to write static func == (lhs: Round, rhs: Round) -> Bool
 }

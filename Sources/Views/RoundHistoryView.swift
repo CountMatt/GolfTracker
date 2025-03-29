@@ -1,14 +1,14 @@
+
 // File: Sources/Views/RoundHistoryView.swift
 import SwiftUI
 import OSLog
 
 struct RoundHistoryView: View {
-    // --- Bindings ---
-    @Binding var rounds: [Round]
-    @Binding var selectedRound: Round? // To potentially navigate from here too
-    @Binding var showRoundView: Bool   // To trigger navigation
-
-    // --- Passed Properties (NEW: Added properties to accept colors) ---
+    // --- Bindings & Properties ---
+    // Receive rounds directly for display (now read-only from DataManager)
+    let rounds: [Round] // Changed from Binding to let
+    @Binding var selectedRoundID: Round.ID? // Use ID for navigation trigger
+    // Colors passed in
     let cardColor: Color
     let textColor: Color
     let secondaryTextColor: Color
@@ -17,125 +17,99 @@ struct RoundHistoryView: View {
 
     // --- Internal State/Helpers ---
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "GolfTracker", category: "RoundHistoryView")
-    private let dataManager = DataManager.shared // For deletion
+    // Access shared DataManager for deletion ONLY
+    private let dataManager = DataManager.shared
 
-    // Computed property for sorted rounds (keeps view body cleaner)
+    // Computed property for sorted rounds
     private var sortedRounds: [Round] {
         rounds.sorted { $0.date > $1.date }
     }
 
     var body: some View {
-        // Use NavigationView for title and potential toolbar items within this tab
         NavigationView {
             List {
-                // Use the computed property for iteration
                 ForEach(sortedRounds) { round in
-                    // ZStack makes the entire row area linkable, overlaying the invisible NavigationLink
-                    ZStack {
-                        // Invisible NavigationLink - triggered by the tap gesture on the ZStack content
-                        NavigationLink(destination: roundDetailView(for: round)) {
-                             EmptyView()
-                         }
-                         .opacity(0) // Make the default chevron/arrow invisible
-
-                        // The visible content of the row
-                        RoundSummaryRow(
-                            round: round,
-                            cardColor: cardColor,
-                            textColor: textColor,
-                            secondaryTextColor: secondaryTextColor,
-                            primaryColor: primaryColor
-                        )
+                    // --- Row Content ---
+                    RoundSummaryRow(
+                        round: round,
+                        cardColor: cardColor,
+                        textColor: textColor,
+                        secondaryTextColor: secondaryTextColor,
+                        primaryColor: primaryColor
+                    )
+                    .contentShape(Rectangle()) // Make row tappable
+                    .onTapGesture {
+                        selectedRoundID = round.id // Trigger navigation via ID
                     }
-                    // Make the entire row tappable (redundant with ZStack but safe)
-                    // .contentShape(Rectangle()) // Can often omit this when using ZStack approach
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)) // Standard list padding
-                    .listRowBackground(backgroundColor) // Set row background explicitly
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) { // Swipe action
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowBackground(backgroundColor)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                          deleteButton(for: round)
                     }
-                    .contextMenu { // Context menu (long press)
+                    .contextMenu {
                          deleteButton(for: round)
                     }
                 }
-                 // Use onDelete modifier directly on ForEach for standard swipe-delete behavior
+                 // Use onDelete modifier directly on ForEach
                  .onDelete(perform: deleteItems)
-
             }
-            .listStyle(.plain) // Use plain style
+            .listStyle(.plain)
             .navigationTitle("Round History")
-            .background(backgroundColor.ignoresSafeArea()) // Set overall background
+            .background(backgroundColor.ignoresSafeArea())
              .onAppear {
-                 logger.info("RoundHistoryView appeared.")
+                 logger.info("RoundHistoryView appeared with \(rounds.count) rounds.")
              }
         }
-        .navigationViewStyle(.stack) // Use stack style
+        .navigationViewStyle(.stack)
     }
 
      // Function to handle List's onDelete modifier
      private func deleteItems(at offsets: IndexSet) {
-         // The offsets are relative to the *current* state of the ForEach (which uses sortedRounds)
+         // Map offsets to rounds based on the *sorted* array
          offsets.map { sortedRounds[$0] }.forEach { round in
-             dataManager.deleteRound(with: round.id)
+             dataManager.deleteRound(withId: round.id) // Use DataManager to delete
          }
-         // Reload data in HomeView by modifying the source binding
-         // This assumes HomeView will react correctly. For more complex apps, consider EnvironmentObject.
-         rounds = dataManager.loadRounds() // Reload the binding source
-         logger.info("Deleted items at offsets \(offsets). Reloaded rounds.")
+         // UI updates automatically via HomeView observing DataManager
+         logger.info("Deleted items at offsets \(offsets).")
      }
 
-     // Helper for delete button in swipe actions/context menus
+     // Helper for delete button
      @ViewBuilder private func deleteButton(for round: Round) -> some View {
          Button(role: .destructive) {
-             dataManager.deleteRound(with: round.id)
-             rounds = dataManager.loadRounds() // Reload the binding source
+             dataManager.deleteRound(withId: round.id) // Use DataManager to delete
              logger.info("Deleted round \(round.id) via context/swipe.")
+             // UI updates automatically
          } label: {
              Label("Delete", systemImage: "trash")
          }
          .tint(.red)
      }
 
-     // Generates the destination view for navigation
-     @ViewBuilder private func roundDetailView(for round: Round) -> some View {
-         // Find the index in the original binding to pass to RoundView
-         if let index = rounds.firstIndex(where: { $0.id == round.id }) {
-             RoundView(round: $rounds[index])
-         } else {
-             // Fallback if index not found
-             Text("Error: Could not load round details.")
-                 .onAppear { logger.error("Error finding index for round \(round.id) in RoundHistoryView navigation.") }
-         }
-     }
+     // NavigationLink is now handled by .navigationDestination in HomeView using selectedRoundID
+     // No roundDetailView needed here anymore.
 }
 
 #if DEBUG
 struct RoundHistoryView_Previews: PreviewProvider {
+    // Use non-binding rounds for preview display
     @State static var previewRounds = SampleData.sampleRounds
-    @State static var previewSelectedRound: Round? = nil
-    @State static var previewShowRoundView = false
+    @State static var previewSelectedRoundID: Round.ID? = nil
 
     static var previews: some View {
         RoundHistoryView(
-            rounds: $previewRounds,
-            selectedRound: $previewSelectedRound,
-            showRoundView: $previewShowRoundView,
+            rounds: previewRounds, // Pass non-binding array
+            selectedRoundID: $previewSelectedRoundID,
             // Provide default colors for preview
-            cardColor: .white,
-            textColor: .black,
-            secondaryTextColor: .gray,
-            primaryColor: .green,
-            backgroundColor: Color(.systemGroupedBackground)
+            cardColor: .white, textColor: .black, secondaryTextColor: .gray,
+            primaryColor: .green, backgroundColor: Color(.systemGroupedBackground)
         )
     }
 }
 #endif
 
-// --- DUMMY DEFINITIONS FOR PREVIEW (If needed and not elsewhere) ---
-// Ensure RoundSummaryRow, RoundView, DataManager, Models are accessible
+// --- DUMMY DEFINITIONS FOR PREVIEW ---
+// Ensure necessary structs/classes are accessible
 // struct RoundSummaryRow: View { ... }
-// struct RoundView: View { ... }
-// class DataManager { ... }
 // struct Round { ... }
 // struct SampleData { ... }
-// --- END DUMMY DEFINITIONS ---
+// class DataManager { ... }

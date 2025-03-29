@@ -1,95 +1,129 @@
+
+
 // File: Sources/Controllers/DataManager.swift
 import Foundation
-import OSLog // Import OSLog for better logging
+import OSLog
+import SwiftUI // Import SwiftUI for ObservableObject
 
-@MainActor // Ensure shared instance and methods accessing it are on main thread by default
-class DataManager {
-    static let shared = DataManager() // Simpler singleton initialization
-    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "GolfTracker", category: "DataManager")
-    
-    // Define the filename for storing rounds data
+// Dedicated Actor for safe file operations off the main thread
+actor FileActor {
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "GolfTracker", category: "FileActor")
     private let roundsFilename = "rounds.json"
-    
-    // Computed property to get the URL for the data file in the Documents directory
+
+    // Computed property to get the URL for the data file
     private var roundsFileURL: URL {
-        do {
-            // Get the user's documents directory URL
-            let documentsDirectory = try FileManager.default.url(for: .documentDirectory,
-                                                                 in: .userDomainMask,
-                                                                 appropriateFor: nil,
-                                                                 create: true) // Create directory if it doesn't exist
-            // Append our filename to the directory path
-            return documentsDirectory.appendingPathComponent(roundsFilename)
-        } catch {
-            // If we can't get the documents directory, something is seriously wrong.
-            // Log the error and crash. This path is crucial.
-            logger.critical("FATAL ERROR: Could not determine Documents directory: \(error.localizedDescription)")
-            fatalError("Could not determine Documents directory: \(error.localizedDescription)")
-        }
+        // Using force-try here, as failure is considered fatal for the app's state.
+        // Proper error handling could involve fallback mechanisms or reporting.
+        // swiftlint:disable:next force_try
+        try! FileManager.default.url(for: .documentDirectory,
+                                     in: .userDomainMask,
+                                     appropriateFor: nil,
+                                     create: true)
+            .appendingPathComponent(roundsFilename)
     }
-    
-    // Private initializer to enforce singleton pattern
-    private init() {
-        logger.info("DataManager initialized. Data file path: \(self.roundsFileURL.path)")
-    }
-    
-    // Function to save the array of Round objects to the JSON file
-    func saveRounds(_ rounds: [Round]) {
-        // Use JSONEncoder to convert the [Round] array into Data
+
+    // Saves the provided rounds array to disk
+    func save(_ rounds: [Round]) throws {
+        logger.debug("Attempting to save \(rounds.count) rounds to file...")
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601 // Use a standard date format
-        encoder.outputFormatting = .prettyPrinted // Make JSON easier to read (optional)
-        
-        do {
-            let data = try encoder.encode(rounds)
-            // Write the encoded Data to the file URL atomically (safer)
-            try data.write(to: roundsFileURL, options: [.atomicWrite, .completeFileProtection])
-            logger.info("Successfully saved \(rounds.count) rounds to \(self.roundsFileURL.lastPathComponent)")
-        } catch {
-            // Log any errors during encoding or writing
-            logger.error("Error saving rounds to \(self.roundsFileURL.path): \(error.localizedDescription)")
-        }
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = .prettyPrinted // Optional: for readability
+
+        let data = try encoder.encode(rounds)
+        try data.write(to: roundsFileURL, options: [.atomicWrite, .completeFileProtection])
+        logger.info("Successfully saved \(rounds.count) rounds to \(self.roundsFileURL.lastPathComponent)")
     }
-    
-    // Function to load the array of Round objects from the JSON file
-    func loadRounds() -> [Round] {
-        // Check if the data file exists
+
+    // Loads rounds from disk
+    func load() throws -> [Round] {
+        logger.debug("Attempting to load rounds from file...")
         guard FileManager.default.fileExists(atPath: roundsFileURL.path) else {
-            logger.info("Rounds file not found at \(self.roundsFileURL.path). Returning empty array (or sample data).")
-            // If the file doesn't exist, return an empty array or initial sample data
-            // return SampleData.sampleRounds // Uncomment this line if you want sample data on first launch
-            return [] // Return empty array if no file exists
+            logger.info("Rounds file not found. Returning empty array.")
+            return [] // No file exists yet
         }
-        
-        // Use JSONDecoder to convert Data back into a [Round] array
+
+        let data = try Data(contentsOf: roundsFileURL)
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601 // Match the encoding strategy
-        
-        do {
-            // Read the Data from the file URL
-            let data = try Data(contentsOf: roundsFileURL)
-            // Decode the Data into an array of Round objects
-            let rounds = try decoder.decode([Round].self, from: data)
-            logger.info("Successfully loaded \(rounds.count) rounds from \(self.roundsFileURL.lastPathComponent)")
-            return rounds
-        } catch {
-            // Log any errors during reading or decoding
-            // This could happen if the file is corrupted or the data format changed
-            logger.error("Error loading rounds from \(self.roundsFileURL.path): \(error.localizedDescription). Returning empty array.")
-            // Consider deleting the corrupted file or attempting a backup recovery here if needed
-            // For now, just return an empty array to prevent crashing
-            return []
+        decoder.dateDecodingStrategy = .iso8601
+        let rounds = try decoder.decode([Round].self, from: data)
+        logger.info("Successfully loaded \(rounds.count) rounds from \(self.roundsFileURL.lastPathComponent)")
+        return rounds
+    }
+}
+
+
+@MainActor // Ensures @Published updates happen on the main thread
+class DataManager: ObservableObject {
+    @Published private(set) var rounds: [Round] = [] // The single source of truth
+
+    static let shared = DataManager() // Singleton instance
+
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "GolfTracker", category: "DataManager")
+    private let fileActor = FileActor() // Instance of the actor for file operations
+
+    // Private initializer to load data asynchronously on creation
+    private init() {
+        logger.info("DataManager initializing...")
+        Task {
+            await loadInitialData()
+            logger.info("Initial data load complete. \(self.rounds.count) rounds loaded.")
         }
     }
-    
-    // Keep the delete function, as it correctly uses load/save
-    func deleteRound(with id: UUID) {
-        var rounds = loadRounds()
+
+    // Loads initial data from the file actor
+    private func loadInitialData() async {
+        do {
+            let loadedRounds = try await fileActor.load()
+            // Assign on MainActor (guaranteed by class annotation)
+            self.rounds = loadedRounds
+            // Optional: Load sample data if file was empty
+            // if self.rounds.isEmpty {
+            //     self.rounds = SampleData.sampleRounds
+            //     await saveChanges() // Save sample data immediately if loaded
+            // }
+        } catch {
+            logger.error("Failed to load initial rounds: \(error.localizedDescription)")
+            // Handle error appropriately, e.g., show an alert to the user
+        }
+    }
+
+    // Saves the current state of the 'rounds' array asynchronously
+    private func saveChanges() async {
+        logger.debug("Save changes requested...")
+        let currentRounds = self.rounds // Capture current state for saving
+        do {
+            try await fileActor.save(currentRounds)
+        } catch {
+            logger.error("Failed to save rounds: \(error.localizedDescription)")
+            // Handle save error (e.g., retry logic, user alert)
+        }
+    }
+
+    // --- Public Methods for Modifying Data ---
+
+    func addRound(_ newRound: Round) {
+        logger.info("Adding new round: \(newRound.id)")
+        rounds.append(newRound)
+        Task { await saveChanges() } // Trigger async save
+    }
+
+    func updateRound(_ updatedRound: Round) {
+        guard let index = rounds.firstIndex(where: { $0.id == updatedRound.id }) else {
+            logger.warning("Attempted to update round (\(updatedRound.id)) but it was not found.")
+            return
+        }
+        logger.info("Updating round: \(updatedRound.id)")
+        rounds[index] = updatedRound
+        Task { await saveChanges() } // Trigger async save
+    }
+
+    func deleteRound(withId id: UUID) {
+        logger.info("Requesting deletion for round: \(id)")
         if rounds.removeAll(where: { $0.id == id }) != nil {
-            logger.info("Deleting round with ID: \(id)")
-            saveRounds(rounds)
+            logger.info("Round \(id) removed from memory.")
+            Task { await saveChanges() } // Trigger async save
         } else {
-            logger.warning("Attempted to delete round with ID \(id), but it was not found.")
+            logger.warning("Attempted to delete round (\(id)) but it was not found in memory.")
         }
     }
 }
