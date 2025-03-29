@@ -25,7 +25,7 @@ struct WindIndicatorView: View {
 }
 
 
-// MARK: - Main Hole View (Reverted State)
+// MARK: - Main Hole View (Corrected Default Score Logic)
 struct HoleView: View {
     // --- Properties ---
     @Binding var hole: Hole
@@ -65,10 +65,15 @@ struct HoleView: View {
             }
             .padding() // Add padding once around the main VStack
             .onAppear {
-                 // Only initialize score if needed
-                 if hole.score == 0 && hole.par > 0 { hole.score = hole.par }
+                 // Initial setup when the view first appears (might be the first hole)
+                 setDefaultScoreIfNeeded()
+                 logger.info("HoleView appeared for hole \(hole.number).")
             }
-            // .onDisappear { /* No location updates to stop */ } // Removed location manager call
+            // *** Use onChange to detect when the specific hole changes ***
+            .onChange(of: hole.id) { // Triggered when navigating Next/Previous
+                logger.info("Hole changed to \(hole.number). Applying default score if needed.")
+                setDefaultScoreIfNeeded()
+            }
             .toolbar { // Keep keyboard toolbar
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer(); Button("Done") { isApproachDistanceFocused = false; isFirstPuttDistanceFocused = false }
@@ -80,6 +85,18 @@ struct HoleView: View {
             }
         } // End ScrollView
     } // End body
+
+    // --- Function to Set Default Score ---
+    private func setDefaultScoreIfNeeded() {
+        // Set score to par ONLY if the current score is still 0 (or uninitialized)
+        // AND the par is valid (>0). This prevents overwriting a score the user already entered.
+        if hole.score == 0 && hole.par > 0 {
+             hole.score = hole.par
+             logger.debug("Hole \(hole.number): Default score set to par (\(hole.par)).")
+         } else {
+              logger.debug("Hole \(hole.number): Score (\(hole.score)) already set or par (\(hole.par)) invalid, not applying default.")
+          }
+    }
 
 
     // --- Extracted Subview Sections ---
@@ -101,7 +118,13 @@ struct HoleView: View {
         HStack {
             Text("Par:").font(.headline)
             ForEach([3, 4, 5], id: \.self) { parValue in
-                Button { hole.par = parValue; hole.score = parValue } label: {
+                Button {
+                     hole.par = parValue
+                     // Also reset score to new par if score hasn't been manually changed from previous par default
+                     if hole.score == 0 || getScoreOptions(for: hole.par).contains(hole.score) { // Check if score is still default-like
+                          hole.score = parValue
+                     }
+                } label: {
                     Text("\(parValue)").padding(.horizontal, 12).padding(.vertical, 6)
                         .background(hole.par == parValue ? Color.green : Color.gray.opacity(0.2))
                         .foregroundColor(hole.par == parValue ? .white : .primary).cornerRadius(8)
@@ -140,7 +163,7 @@ struct HoleView: View {
                  }
                  .padding(8).background(Color.gray.opacity(0.1)).cornerRadius(6)
              }
-         }
+         } // Implicitly returns EmptyView if no conditions met
      }
 
 
@@ -270,11 +293,6 @@ struct HoleView: View {
          return isSelected ? .white : .primary
      }
 
-    // MARK: Weather Fetch Logic (REMOVED)
-    // private func fetchCurrentWeather() { /* ... */ }
-    // private func getWeatherData(for location: CLLocation) { /* ... */ }
-    // private var appName: String { /* ... */ } // Not needed if fetchCurrentWeather is removed
-
     // MARK: Score Helpers
     private func getScoreOptions(for par: Int) -> [Int] { guard par >= 3 else { return [1, 2, 3, 4, 5] }; let base = par - 2; return (max(1, base)...par + 3).map { $0 } }
     private func scoreString(for score: Int, par: Int) -> String { guard par > 0 else { return "\(score)" }; let diff = score - par; if score == 1 { return "Ace!" }; if diff < -2 { return "\(diff)" }; if diff == -2 { return "Eagle" }; if diff == -1 { return "Birdie" }; if diff == 0 { return "Par" }; if diff == 1 { return "Bogey" }; if diff == 2 { return "Dbl" }; return "+\(diff)" }
@@ -283,9 +301,10 @@ struct HoleView: View {
 
 } // End HoleView
 
+
 // MARK: - Supporting Views Defined Locally
 
-// Wind settings sheet (Keep this for manual wind setting)
+// Wind settings sheet
 struct WindSettingsView: View {
     @Binding var windSpeed: Double
     @Binding var windDirection: Int
@@ -336,5 +355,3 @@ struct HoleView_Previews: PreviewProvider {
      static var previews: some View { NavigationView { HoleView(hole: $previewHole) } }
  }
 #endif
-
-
