@@ -12,8 +12,12 @@ class DataManager {
     func saveRounds(_ rounds: [Round]) {
         // Save to UserDefaults for quick access
         do {
-            let data = try JSONEncoder().encode(rounds)
+            let encoder = JSONEncoder()
+            let data = try encoder.encode(rounds)
             UserDefaults.standard.set(data, forKey: roundsKey)
+            UserDefaults.standard.synchronize() // Force immediate save
+            
+            print("Successfully saved \(rounds.count) rounds")
         } catch {
             print("Error saving rounds: \(error.localizedDescription)")
         }

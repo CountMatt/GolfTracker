@@ -13,69 +13,146 @@ struct HomeView: View {
             TabView(selection: $selectedTab) {
                 // HOME TAB
                 NavigationView {
-                    ScrollView {
-                        VStack(spacing: 16) {
-                            // Header
-                            Text("Golf Tracker")
-                                .font(.largeTitle)
-                                .fontWeight(.bold)
-                                .padding(.top)
-                            
-                            // Stats summary
-                            StatSummaryView(statistics: statistics)
-                            
-                            // New round button
-                            Button {
-                                showingNewRoundOptions = true
-                            } label: {
-                                HStack {
-                                    Image(systemName: "plus.circle.fill")
-                                    Text("New Round")
-                                }
-                                .fontWeight(.semibold)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.green)
-                                .foregroundColor(.white)
-                                .cornerRadius(10)
-                            }
-                            .padding(.horizontal)
-                            
-                            // Recent rounds
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Recent Rounds")
-                                    .font(.headline)
+                    ZStack {
+                        // Background color
+                        Color(hex: "F8F9FA").ignoresSafeArea()
+                        
+                        ScrollView {
+                            VStack(spacing: 24) {
+                                // Header with subtle gradient background
+                                ZStack {
+                                    // Subtle gradient background
+                                    LinearGradient(
+                                        colors: [Color(hex: "E2EADF"), Color(hex: "F8F9FA")],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                    .frame(height: 120)
+                                    .clipShape(RoundedRectangle(cornerRadius: 16))
                                     .padding(.horizontal)
-                                
-                                if rounds.isEmpty {
-                                    Text("No rounds recorded yet")
-                                        .foregroundColor(.gray)
-                                        .padding()
-                                        .frame(maxWidth: .infinity, alignment: .center)
-                                } else {
-                                    ForEach(rounds.sorted(by: { $0.date > $1.date })) { round in
-                                        RoundSummaryRow(round: round)
-                                            .padding(.horizontal)
-                                            .padding(.vertical, 8)
-                                            .background(Color(.systemBackground))
-                                            .cornerRadius(8)
-                                            .onTapGesture {
-                                                selectedRound = round
-                                                showRoundView = true
-                                            }
-                                            .padding(.horizontal, 8)
+                                    
+                                    VStack(spacing: 8) {
+                                        Text("Golf Tracker")
+                                            .font(.title)
+                                            .bold()
+                                            .foregroundColor(Color(hex: "252C34"))
                                         
-                                        Divider()
-                                            .padding(.horizontal)
+                                        Text("\(statistics.totalRounds) rounds recorded")
+                                            .font(.subheadline)
+                                            .foregroundColor(Color(hex: "5F6B7A"))
                                     }
-                                    .padding(.bottom, 20)
                                 }
+                                .padding(.top)
+                                
+                                // Start round action card
+                                Button {
+                                    showingNewRoundOptions = true
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text("Start New Round")
+                                                .font(.headline)
+                                                .foregroundColor(.white)
+                                            
+                                            Text("Record your next golf adventure")
+                                                .font(.subheadline)
+                                                .foregroundColor(Color.white.opacity(0.9))
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        Image(systemName: "plus.circle.fill")
+                                            .font(.system(size: 32))
+                                            .foregroundColor(.white)
+                                    }
+                                    .padding()
+                                    .background(
+                                        LinearGradient(
+                                            colors: [Color(hex: "2D7D46"), Color(hex: "18A558")],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .cornerRadius(16)
+                                    .shadow(color: Color(hex: "2D7D46").opacity(0.3), radius: 8, x: 0, y: 4)
+                                    .padding(.horizontal)
+                                    .buttonStyle(PressableButtonStyle())
+                                }
+                                
+                                // Stats summary
+                                StatSummaryView(statistics: statistics)
+                                
+                                // Recent rounds section
+                                VStack(alignment: .leading, spacing: 16) {
+                                    HStack {
+                                        Text("Recent Rounds")
+                                            .font(.headline)
+                                            .foregroundColor(Color(hex: "252C34"))
+                                        
+                                        Spacer()
+                                    }
+                                    .padding(.horizontal)
+                                    
+                                    if rounds.isEmpty {
+                                        // Empty state
+                                        VStack(spacing: 16) {
+                                            Image(systemName: "flag.fill")
+                                                .font(.system(size: 48))
+                                                .foregroundColor(Color(hex: "CBD5E0"))
+                                            
+                                            Text("No rounds recorded yet")
+                                                .font(.headline)
+                                                .foregroundColor(Color(hex: "5F6B7A"))
+                                            
+                                            Text("Start a new round to begin tracking your golf journey")
+                                                .font(.subheadline)
+                                                .foregroundColor(Color(hex: "5F6B7A"))
+                                                .multilineTextAlignment(.center)
+                                                .padding(.horizontal)
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 32)
+                                        .background(Color.white)
+                                        .cornerRadius(12)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(Color(hex: "CBD5E0"), lineWidth: 1)
+                                        )
+                                        .padding(.horizontal)
+                                    } else {
+                                        // List of rounds
+                                        VStack(spacing: 2) {
+                                            ForEach(rounds.sorted(by: { $0.date > $1.date })) { round in
+                                                RoundSummaryRow(round: round)
+                                                    .padding(.horizontal)
+                                                    .padding(.vertical, 8)
+                                                    .background(Color.white)
+                                                    .contentShape(Rectangle())
+                                                    .onTapGesture {
+                                                        selectedRound = round
+                                                        showRoundView = true
+                                                    }
+                                                
+                                                if round.id != rounds.sorted(by: { $0.date > $1.date }).last?.id {
+                                                    Divider()
+                                                        .padding(.horizontal)
+                                                }
+                                            }
+                                        }
+                                        .background(Color.white)
+                                        .cornerRadius(16)
+                                        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+                                        .padding(.horizontal)
+                                    }
+                                }
+                                
+                                // Bottom spacing for tab bar
+                                Spacer(minLength: 60)
                             }
                         }
-                        .padding(.bottom, 50) // Extra bottom padding
                     }
                     .navigationBarHidden(true)
-                    .edgesIgnoringSafeArea(.bottom) // Important to fix tab bar area
+                    .edgesIgnoringSafeArea(.bottom)
                 }
                 .tabItem {
                     Label("Home", systemImage: "house.fill")
@@ -117,13 +194,18 @@ struct HomeView: View {
         ) {
             Button("9 Holes") {
                 startNewRound(holeCount: 9)
+                   
             }
             Button("18 Holes") {
                 startNewRound(holeCount: 18)
+                    
             }
             Button("Cancel", role: .cancel) { }
+                
         }
     }
+    
+    // MARK: - Existing Data Methods (Keep these as they are)
     
     private func startNewRound(holeCount: Int) {
         let newRound = Round.createNew(holeCount: holeCount)
@@ -157,7 +239,34 @@ struct HomeView: View {
             saveData()
         }
     }
+    // Add this to the HomeView struct
+    private func configureNavigation() {
+        let navigationBarAppearance = UINavigationBarAppearance()
+        navigationBarAppearance.configureWithOpaqueBackground()
+        navigationBarAppearance.backgroundColor = UIColor(Color.white)
+        navigationBarAppearance.shadowColor = .clear
+        navigationBarAppearance.titleTextAttributes = [
+            .foregroundColor: UIColor(Color(hex: "252C34")),
+            .font: UIFont.systemFont(ofSize: 18, weight: .semibold)
+        ]
+        
+        UINavigationBar.appearance().standardAppearance = navigationBarAppearance
+        UINavigationBar.appearance().scrollEdgeAppearance = navigationBarAppearance
+    }
 }
+
+// For button press animations
+struct PressableButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .opacity(configuration.isPressed ? 0.9 : 1)
+            .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
+    }
+}
+
+
+
 
 struct RoundSummaryRow: View {
     let round: Round
@@ -199,5 +308,34 @@ struct RoundSummaryRow: View {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         return formatter.string(from: round.date)
+    }
+}
+
+
+// Helper extension for hex colors
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
+        }
+        
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
     }
 }

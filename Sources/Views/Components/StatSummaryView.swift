@@ -12,148 +12,176 @@ import SwiftUI
 struct StatSummaryView: View {
     let statistics: Statistics
     
-    // Target values for stats
-    private let targetScore: Double = 78.0
-    private let bestPuttsPerHole: Double = 1.5  // Best realistic putts per hole
-    private let worstPuttsPerHole: Double = 3.0 // Worst expected putts per hole
-    
     var body: some View {
-        VStack(spacing: 8) {
-            Text("Key Statistics")
-                .font(.headline)
-                .padding(.bottom, 2)
+        VStack(spacing: 16) {
+            HStack{
+                Spacer().frame(width: 16)
+                Text("Performance Overview")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(Color(hex: "252C34"))
+                
+                Spacer()
+            }
             
-            HStack(spacing: 20) {
+            HStack(spacing: 12) {
+                Spacer().frame(width:0)
                 // Average Score
-                CircularStatView(
-                    value: getScoreProgress(),
-                    label: "Avg Score",
-                    valueText: String(format: "%.1f", statistics.averageScore),
-                    color: getScoreColor()
+                StatisticCard(
+                    title: "Avg Score",
+                    value: String(format: "%.1f", statistics.averageScore),
+                    icon: "number.circle.fill",
+                    color: Color(hex: "2D7D46")
                 )
                 
                 // GIR
-                CircularStatView(
-                    value: min(statistics.girPercentage / 100.0, 1.0),
-                    label: "GIR",
-                    valueText: String(format: "%.0f%%", statistics.girPercentage),
-                    color: Color.green
+               
+                StatisticCard(
+                    title: "GIR",
+                    value: String(format: "%.0f%%", statistics.girPercentage),
+                    icon: "target",
+                    color: Color(hex: "18A558")
+                    
                 )
+                Spacer().frame(width: 0)
             }
             
-            HStack(spacing: 20) {
-                // Fairways
-                CircularStatView(
-                    value: min(statistics.fairwayHitPercentage / 100.0, 1.0),
-                    label: "Fairways",
-                    valueText: String(format: "%.0f%%", statistics.fairwayHitPercentage),
-                    color: Color.blue
+            HStack(spacing: 12) {
+                Spacer().frame(width: 0)
+                // Fairways hit
+                StatisticCard(
+                    title: "Fairways",
+                    value: String(format: "%.0f%%", statistics.fairwayHitPercentage),
+                    icon: "arrow.up.forward",
+                    color: Color(hex: "E67E22")
                 )
                 
-                // Putts/Hole
-                CircularStatView(
-                    value: getPuttsProgress(),
-                    label: "Putts/Hole",
-                    valueText: String(format: "%.1f", statistics.averagePuttsPerHole),
-                    color: getPuttsColor()
+                // Putts per hole
+                StatisticCard(
+                    title: "Putts/Hole",
+                    value: String(format: "%.1f", statistics.averagePuttsPerHole),
+                    icon: "flag.fill",
+                    color: Color(hex: "5F6B7A")
                 )
+                Spacer().frame(width: 0)
             }
-        }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(10)
-        .padding(.horizontal)
-    }
-    
-    // Calculate score progress (lower is better, so we invert)
-    private func getScoreProgress() -> Double {
-        if statistics.averageScore <= targetScore {
-            // If better than target, fill completely
-            return 1.0
-        } else if statistics.averageScore >= 100 {
-            // If over 100, minimum fill
-            return 0.1
-        } else {
-            // Linear scale from target to 100
-            let range = 100.0 - targetScore
-            let overTarget = statistics.averageScore - targetScore
-            return max(0.1, min(1.0, 1.0 - (overTarget / range)))
-        }
-    }
-    
-    // Calculate putts progress (lower is better)
-    private func getPuttsProgress() -> Double {
-        if statistics.averagePuttsPerHole <= bestPuttsPerHole {
-            return 1.0
-        } else if statistics.averagePuttsPerHole >= worstPuttsPerHole {
-            return 0.1
-        } else {
-            let range = worstPuttsPerHole - bestPuttsPerHole
-            let value = worstPuttsPerHole - statistics.averagePuttsPerHole
-            return max(0.1, min(1.0, value / range))
-        }
-    }
-    
-    // Get color for score
-    private func getScoreColor() -> Color {
-        if statistics.averageScore <= targetScore - 5 {
-            return Color.purple  // Exceptional
-        } else if statistics.averageScore <= targetScore {
-            return Color.green   // At or below target
-        } else if statistics.averageScore <= targetScore + 5 {
-            return Color.orange  // Slightly above target
-        } else {
-            return Color.red     // Well above target
-        }
-    }
-    
-    // Get color for putts
-    private func getPuttsColor() -> Color {
-        if statistics.averagePuttsPerHole <= 1.8 {
-            return Color.purple  // Exceptional
-        } else if statistics.averagePuttsPerHole <= 2.0 {
-            return Color.green   // Good
-        } else if statistics.averagePuttsPerHole <= 2.5 {
-            return Color.orange  // Average
-        } else {
-            return Color.red     // Needs improvement
         }
     }
 }
+
+struct StatisticCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Card header
+            HStack {
+                Image(systemName: icon)
+                    .font(.system(size: 16))
+                    .foregroundColor(color)
+                
+                Text(title)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(Color(hex: "5F6B7A"))
+            }
+            
+            // Value display
+            Text(value)
+                .font(.system(size: 24, weight: .bold))
+                .foregroundColor(Color(hex: "252C34"))
+            
+            // Progress indicator at bottom
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    // Background track
+                    Capsule()
+                        .fill(Color(hex: "E2EADF"))
+                        .frame(height: 4)
+                    
+                    // Progress fill
+                    Capsule()
+                        .fill(color)
+                        .frame(width: min(CGFloat(valuePercentage) * geometry.size.width, geometry.size.width), height: 4)
+                }
+            }
+            .frame(height: 4)
+        }
+        .padding(16)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+        .frame(maxWidth: .infinity)
+    }
+    
+    // Helper to approximate percentage for progress bar
+    var valuePercentage: Double {
+        // Convert string value to percentage for progress bar
+        if let numValue = Double(value.replacingOccurrences(of: "%", with: "")) {
+            if value.contains("%") {
+                return numValue / 100.0
+            } else if title == "Avg Score" {
+                // Assuming good score is around 72, bad is 100+
+                return max(0.0, min(1.0, (100.0 - numValue) / 28.0))
+            } else if title == "Putts/Hole" {
+                // Assuming 1.0 putts is perfect, 3.0 is poor
+                return max(0.0, min(1.0, (3.0 - numValue) / 2.0))
+            }
+        }
+        return 0.5 // Default fallback
+    }
+}
+
+
+//MARK Circular Stats View
 
 struct CircularStatView: View {
     let value: Double        // Progress value (0.0 to 1.0)
     let label: String        // Label text
     let valueText: String    // Value to display
     let color: Color         // Color of progress
+    @State private var animatedValue: Double = 0
     
     var body: some View {
         VStack {
             ZStack {
                 // Background circle
                 Circle()
-                    .stroke(Color.gray.opacity(0.3), lineWidth: 8)
-                    .frame(width: 80, height: 80)
+                    .stroke(Color(hex: "E2EADF"), lineWidth: 10)
+                    .frame(width: 90, height: 90)
                 
                 // Progress circle
                 Circle()
-                    .trim(from: 0, to: CGFloat(value))
-                    .stroke(color, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                    .frame(width: 80, height: 80)
+                    .trim(from: 0, to: CGFloat(animatedValue))
+                    .stroke(
+                        color,
+                        style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                    )
+                    .frame(width: 90, height: 90)
                     .rotationEffect(.degrees(-90))
-                    .animation(.easeOut, value: value)
                 
-                // Value text
-                Text(valueText)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.primary)
+                // Center content
+                VStack(spacing: 2) {
+                    Text(valueText)
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(Color(hex: "252C34"))
+                    
+                    Text(label)
+                        .font(.system(size: 12))
+                        .foregroundColor(Color(hex: "5F6B7A"))
+                }
             }
-            
-            Text(label)
-                .font(.caption)
-                .foregroundColor(.gray)
-                .padding(.top, 4)
         }
-        .frame(maxWidth: .infinity)
+        .onAppear {
+            withAnimation(.easeOut(duration: 1.2)) {
+                animatedValue = value
+            }
+        }
+        .onChange(of: value) { newValue in
+            withAnimation(.easeOut(duration: 0.6)) {
+                animatedValue = newValue
+            }
+        }
     }
 }

@@ -1,28 +1,91 @@
-//
-//  HoleView.swift
-//  GolfTracker
-//
-//  Created by Matteo Keller on 25.03.2025.
-//
-
-
-// File: Sources/Views/HoleView.swift
 import SwiftUI
+import CoreLocation
 
+// Location Manager for getting GPS coordinates
+class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
+    private let locationManager = CLLocationManager()
+    @Published var location: CLLocation?
+    @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
+    @Published var lastError: String?
+    
+    override init() {
+        super.init()
+        locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+    }
+    
+    func requestLocationPermission() {
+        locationManager.requestWhenInUseAuthorization()
+    }
+    
+    func startUpdatingLocation() {
+        // Check authorization status
+        let status = locationManager.authorizationStatus
+        
+        switch status {
+        case .authorizedWhenInUse, .authorizedAlways:
+            locationManager.startUpdatingLocation()
+        case .denied, .restricted:
+            lastError = "Location access denied. Please enable in Settings."
+        case .notDetermined:
+            requestLocationPermission()
+        @unknown default:
+            lastError = "Unknown location authorization status"
+        }
+    }
+    
+    // CLLocationManagerDelegate methods
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        location = locations.last
+        lastError = nil
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        lastError = "Location error: \(error.localizedDescription)"
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        authorizationStatus = status
+        
+        if status == .authorizedWhenInUse || status == .authorizedAlways {
+            locationManager.startUpdatingLocation()
+        }
+    }
+}
 
+// Simple wind display view
+struct WindIndicatorView: View {
+    let speed: Double
+    let direction: Int
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            // Wind direction arrow
+            Image(systemName: "arrow.up")
+                .rotationEffect(.degrees(Double(direction)))
+                .frame(width: 20, height: 20)
+            
+            // Wind speed
+            Text("\(Int(speed)) m/s")
+                .font(.system(size: 14))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(speed > 0 ? Color.blue.opacity(0.2) : Color.gray.opacity(0.2))
+        .cornerRadius(8)
+    }
+}
 
 struct HoleView: View {
     @Binding var hole: Hole
     @FocusState private var isApproachDistanceFocused: Bool
     @FocusState private var isFirstPuttDistanceFocused: Bool
     
-    // Add this function right here
-    private func saveHoleData() {
-        // This forces the binding to update by accessing it
-        let _ = hole
-    }
+    @StateObject private var locationManager = LocationManager()
+    @State private var isLoadingWeather = false
+    @State private var weatherError: String? = nil
+    @State private var showWindSettings = false
     
-    // Rest of your existing code...
     // Limited club selections for tee and approach shots
     private let teeClubOptions = [
         Club(type: .driver, name: "Driver"),
@@ -45,7 +108,7 @@ struct HoleView: View {
         Club(type: .wedge, name: "54°"),
         Club(type: .wedge, name: "58°")
     ]
-       
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -74,8 +137,72 @@ struct HoleView: View {
                             }
                         }
                     }
+                    
+                    // Wind section
+                    HStack {
+                        Text("Wind:")
+                            .font(.subheadline)
+                        
+                        Button(action: {
+                            showWindSettings = true
+                        }) {
+                            WindIndicatorView(speed: hole.windSpeed, direction: hole.windDirection)
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            updateWindFromWeatherData()
+                        }) {
+                            HStack {
+                                Image(systemName: "location.fill")
+                                Text("Current")
+                            }
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(6)
+                        }
+                        .disabled(isLoadingWeather)
+                        
+                        if isLoadingWeather {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                        }
+                    }
+                    
+                    if let error = weatherError {
+                        Text(error)
+                            .foregroundColor(.red)
+                            .font(.caption)
+                    }
+                    
+                    // Show wind impact if approach distance is set
+                    if let distance = hole.approachDistance {
+                        let impact = hole.calculateWindImpact(distance: distance)
+                        if abs(impact) > 0 {
+                            HStack {
+                                Image(systemName: impact > 0 ? "arrow.up" : "arrow.down")
+                                    .foregroundColor(impact > 0 ? .green : .red)
+                                
+                                Text("Wind \(impact > 0 ? "helps" : "hurts") \(abs(impact)) meters")
+                                    .font(.caption)
+                                    .foregroundColor(impact > 0 ? .green : .red)
+                                
+                                Spacer()
+                                
+                                Text("Effective: \(distance + impact)m")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                            }
+                            .padding(6)
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(6)
+                        }
+                    }
                 }
-                .padding(.bottom, 4)
                 
                 Divider()
                 
@@ -125,7 +252,7 @@ struct HoleView: View {
                                         .background(hole.fairwayHit == false && hole.fairwayMissDirection == .left ?
                                                     Color.red.opacity(0.7) : Color.gray.opacity(0.2))
                                         .foregroundColor(hole.fairwayHit == false && hole.fairwayMissDirection == .left ?
-                                            .white : .primary)
+                                                         .white : .primary)
                                         .cornerRadius(8)
                                 }
                                 
@@ -150,7 +277,7 @@ struct HoleView: View {
                                         .background(hole.fairwayHit == false && hole.fairwayMissDirection == .right ?
                                                     Color.red.opacity(0.7) : Color.gray.opacity(0.2))
                                         .foregroundColor(hole.fairwayHit == false && hole.fairwayMissDirection == .right ?
-                                            .white : .primary)
+                                                         .white : .primary)
                                         .cornerRadius(8)
                                 }
                             }
@@ -316,18 +443,69 @@ struct HoleView: View {
                         isFirstPuttDistanceFocused = false
                     }
                 }
-                
             }
             .onDisappear {
                 // Make sure data is saved when leaving the view
                 saveHoleData()
             }
-            
+            .sheet(isPresented: $showWindSettings) {
+                WindSettingsView(
+                    windSpeed: $hole.windSpeed,
+                    windDirection: $hole.windDirection,
+                    approachDistance: hole.approachDistance
+                )
+                .presentationDetents([.medium])
+            }
         }
-        
     }
     
+    // Helper function to ensure data is saved
+    private func saveHoleData() {
+        // Force binding update
+        let _ = hole
+    }
     
+    // Function to update wind from weather API
+    private func updateWindFromWeatherData() {
+        // First check authorization status
+        if locationManager.authorizationStatus != .authorizedWhenInUse &&
+           locationManager.authorizationStatus != .authorizedAlways {
+            locationManager.requestLocationPermission()
+            weatherError = "Please allow location access"
+            return
+        }
+        
+        // Then check for location
+        guard let location = locationManager.location else {
+            weatherError = locationManager.lastError ?? "Location not available"
+            return
+        }
+        
+        isLoadingWeather = true
+        weatherError = nil
+        
+        Task {
+            do {
+                let weatherService = WeatherService()
+                let windData = try await weatherService.getWindData(
+                    latitude: location.coordinate.latitude,
+                    longitude: location.coordinate.longitude
+                )
+                
+                await MainActor.run {
+                    hole.windSpeed = windData.speed
+                    hole.windDirection = Int(windData.direction)
+                    isLoadingWeather = false
+                }
+            } catch {
+                await MainActor.run {
+                    weatherError = "Weather data error: \(error.localizedDescription)"
+                    isLoadingWeather = false
+                }
+            }
+        }
+    }
+    }
     
     // Helper function to get score options based on par
     private func getScoreOptions(for par: Int) -> [Int] {
@@ -377,6 +555,121 @@ struct HoleView: View {
         } else {
             return Color.gray     // Double bogey or worse
         }
+    }
+
+
+// Wind settings sheet
+struct WindSettingsView: View {
+    @Binding var windSpeed: Double
+    @Binding var windDirection: Int
+    let approachDistance: Int?
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Wind Settings")
+                .font(.headline)
+            
+            // Wind direction picker
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Wind Direction:")
+                    .font(.subheadline)
+                
+                Picker("Direction", selection: $windDirection) {
+                    Text("N").tag(0)
+                    Text("NE").tag(45)
+                    Text("E").tag(90)
+                    Text("SE").tag(135)
+                    Text("S").tag(180)
+                    Text("SW").tag(225)
+                    Text("W").tag(270)
+                    Text("NW").tag(315)
+                }
+                .pickerStyle(SegmentedPickerStyle())
+            }
+            
+            // Wind speed slider
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Wind Speed: \(Int(windSpeed)) m/s")
+                    .font(.subheadline)
+                
+                Slider(value: $windSpeed, in: 0...20, step: 1)
+            }
+            
+            // Wind direction visualization
+            ZStack {
+                Circle()
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                    .frame(width: 100, height: 100)
+                
+                // Direction arrow
+                Rectangle()
+                    .fill(Color.blue)
+                    .frame(width: 2, height: 40)
+                    .offset(y: -20)
+                    .rotationEffect(.degrees(Double(windDirection)))
+                
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 10, height: 10)
+            }
+            
+            // Impact preview
+            if let distance = approachDistance {
+                let impact = calculateWindImpact(
+                    distance: distance,
+                    windSpeed: windSpeed,
+                    windDirection: Double(windDirection)
+                )
+                
+                VStack(spacing: 4) {
+                    Text("Estimated Impact")
+                        .font(.subheadline)
+                    
+                    Text("\(distance) meters →  \(distance + impact) meters")
+                        .font(.headline)
+                        .foregroundColor(impact > 0 ? .green : (impact < 0 ? .red : .primary))
+                    
+                    Text(impact > 0 ? "Wind helping" : (impact < 0 ? "Wind hurting" : "No effect"))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(8)
+            }
+            
+            Button("Done") {
+                dismiss()
+            }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(Color.blue)
+            .foregroundColor(.white)
+            .cornerRadius(8)
+        }
+        .padding()
+    }
+    
+    // Wind impact calculation
+    private func calculateWindImpact(distance: Int, windSpeed: Double, windDirection: Double) -> Int {
+        // Convert degrees to radians for calculation
+        let radians = (windDirection * .pi) / 180.0
+        
+        // Calculate headwind/tailwind component
+        let headwindComponent = cos(radians) * windSpeed
+        
+        // Calculate crosswind component
+        let crosswindComponent = sin(radians) * windSpeed
+        
+        // Headwind generally reduces distance more than crosswind
+        let headwindImpact = -headwindComponent * 2.5  // 2.5 meters per m/s headwind
+        let crosswindImpact = abs(crosswindComponent) * 0.8  // 0.8 meters per m/s crosswind
+        
+        // Total impact (negative = shorter, positive = longer)
+        let totalImpact = Int(headwindImpact - crosswindImpact)
+        
+        return totalImpact
     }
 }
 

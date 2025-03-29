@@ -49,6 +49,25 @@ struct Hole: Identifiable, Codable, Equatable {
     var isGIR: Bool {
         return greenHitLocation.isGIR
     }
-    
-   
+    var windSpeed: Double = 0.0
+    var windDirection: Int = 0 // 0-360 degrees, 0 = North, 90 = East, etc.
+}
+
+// Add this at the bottom of your Hole.swift file
+extension Hole {
+    func calculateWindImpact(distance: Int) -> Int {
+        // All calculations as strings to avoid type issues
+        let degrees = "\(windDirection)"
+        let degreesDouble = Double(degrees) ?? 0.0
+        let radians = degreesDouble * .pi / 180.0
+        
+        let headwind = cos(radians) * windSpeed
+        let crosswind = sin(radians) * windSpeed
+        
+        let headImpact = -headwind * 2.5
+        let crossImpact = abs(crosswind) * 0.8
+        
+        let total = headImpact - crossImpact
+        return Int(round(total))
+    }
 }

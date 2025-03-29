@@ -10,6 +10,8 @@ struct RoundView: View {
             // Header
             HStack {
                 Button(action: {
+                    // Explicitly save data before leaving
+                    saveHoleDataBeforeLeaving()
                     presentationMode.wrappedValue.dismiss()
                 }) {
                     Image(systemName: "chevron.left")
@@ -33,12 +35,18 @@ struct RoundView: View {
             if round.holes.indices.contains(currentHoleIndex) {
                 HoleView(hole: $round.holes[currentHoleIndex])
                     .padding()
+                    .onChange(of: round.holes[currentHoleIndex]) { _ in
+                        // Save data whenever a hole is updated
+                        saveHoleDataToUserDefaults()
+                    }
             }
             
             // Navigation buttons
             HStack {
                 Button(action: {
                     if currentHoleIndex > 0 {
+                        // Save current hole data before navigating
+                        saveHoleDataToUserDefaults()
                         currentHoleIndex -= 1
                     }
                 }) {
@@ -52,10 +60,14 @@ struct RoundView: View {
                 Spacer()
                 
                 Button(action: {
+                    // Save current hole data before navigating
+                    saveHoleDataToUserDefaults()
+                    
                     if currentHoleIndex < round.holes.count - 1 {
                         currentHoleIndex += 1
                     } else {
-                        // Finish round and return to home
+                        // Finish round, ensure data is saved, and return to home
+                        saveHoleDataBeforeLeaving()
                         presentationMode.wrappedValue.dismiss()
                     }
                 }) {
@@ -76,8 +88,8 @@ struct RoundView: View {
         }
         .navigationBarHidden(true)
         .onDisappear {
-            // Make sure round is saved when we leave
-            // This will update the binding which updates the round in HomeView
+            // Make sure round is saved when we leave the view
+            saveHoleDataBeforeLeaving()
         }
     }
     
@@ -85,5 +97,28 @@ struct RoundView: View {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         return formatter.string(from: round.date)
+    }
+    
+    // Helper methods to ensure data is saved
+    private func saveHoleDataToUserDefaults() {
+        // Get all existing rounds
+        let rounds = DataManager.shared.loadRounds()
+        
+        // Find and update the current round
+        if let index = rounds.firstIndex(where: { $0.id == round.id }) {
+            var updatedRounds = rounds
+            updatedRounds[index] = round
+            DataManager.shared.saveRounds(updatedRounds)
+        }
+    }
+    
+    private func saveHoleDataBeforeLeaving() {
+        // Perform more comprehensive save when leaving
+        saveHoleDataToUserDefaults()
+        
+        // Optional: log to debug
+        print("Saved round with id: \(round.id)")
+        print("Hole count: \(round.holes.count)")
+        print("First hole score: \(round.holes.first?.score ?? 0)")
     }
 }
