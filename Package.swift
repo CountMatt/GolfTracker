@@ -10,7 +10,7 @@ import AppleProductTypes
 let package = Package(
     name: "GolfTracker",
     platforms: [
-        .iOS("16.0")
+        .iOS("17.0")
     ],
     products: [
         .iOSApplication(
@@ -31,6 +31,9 @@ let package = Package(
                 .landscapeRight,
                 .landscapeLeft,
                 .portraitUpsideDown(.when(deviceFamilies: [.pad]))
+            ],
+            capabilities: [
+                .locationAlwaysAndWhenInUse(purposeString: "Needs location to fetch current weather for the golf course.")
             ]
         )
     ],
@@ -40,5 +43,5 @@ let package = Package(
             path: "."
         )
     ],
-    swiftLanguageVersions: [.v6]
+    swiftLanguageVersions: [.version("6")]
 )
