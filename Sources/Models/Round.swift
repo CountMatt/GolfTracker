@@ -1,3 +1,7 @@
+// --- START OF FILE GolfTracker.swiftpm/Sources/Models/Round.swift ---
+// No changes needed in Round.swift as it's a data model.
+// Keep the existing Round.swift code.
+
 // File: Sources/Models/Round.swift
 import Foundation
 
@@ -27,8 +31,14 @@ struct Round: Identifiable, Codable, Equatable {
         var newHoles: [Hole] = []
         for i in 1...holeCount {
             var par = 4
-            if [3, 6, 11, 16].contains(i) { par = 3 }
-            else if [4, 8, 13, 18].contains(i) { par = 5 }
+            // Default Par Logic (adjust if course specific pars needed later)
+            if holeCount == 9 {
+                if [3, 6].contains(i) { par = 3 }
+                else if [4, 8].contains(i) { par = 5 }
+            } else { // Assume 18 holes
+                if [3, 6, 11, 16].contains(i) { par = 3 }
+                else if [4, 8, 13, 18].contains(i) { par = 5 }
+            }
             newHoles.append(Hole(number: i, par: par))
         }
         return Round(date: Date(), holes: newHoles)
@@ -38,3 +48,4 @@ struct Round: Identifiable, Codable, Equatable {
     // are Equatable, Swift synthesizes the == operator automatically.
     // No need to write static func == (lhs: Round, rhs: Round) -> Bool
 }
+// --- END OF FILE GolfTracker.swiftpm/Sources/Models/Round.swift ---

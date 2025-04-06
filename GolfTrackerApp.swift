@@ -1,3 +1,5 @@
+// --- START OF FILE GolfTracker.swiftpm/GolfTrackerApp.swift ---
+
 import SwiftUI
 import Foundation
 import CoreLocation
@@ -15,10 +17,14 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct GolfTrackerApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    
+
     var body: some Scene {
         WindowGroup {
             HomeView()
+                // You could apply global font/color modifiers here if desired,
+                // but often it's better per-view or via environment.
+                // .environment(\.colorScheme, .light) // Example: Force light mode
         }
     }
 }
+// --- END OF FILE GolfTracker.swiftpm/GolfTrackerApp.swift ---

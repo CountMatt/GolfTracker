@@ -1,48 +1,49 @@
-// File: Sources/Views/HoleView.swift
+// --- START OF FILE GolfTracker.swiftpm/Sources/Views/HoleView.swift ---
+
 import SwiftUI
-// import CoreLocation // No longer needed if LocationManager is removed
-import OSLog       // Keep OSLog if you still want logging
+import OSLog
 
-// NOTE: LocationManager class is REMOVED from this file.
-
-// MARK: - Simple wind display view
+// MARK: - Simple wind display view (Used by Wind Button)
 struct WindIndicatorView: View {
     let speed: Double
-    let direction: Int
+    let direction: Int // Degrees
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Theme.spacingXXS) { // Use Theme spacing
             Image(systemName: "arrow.up")
                 .rotationEffect(.degrees(Double(direction)))
                 .frame(width: 20, height: 20)
-            Text("\(Int(speed.rounded())) m/s") // Rounded speed
-                .font(.system(size: 14))
+                .foregroundColor(speed > 0 ? Theme.accentSecondary : Theme.textSecondary) // Use Theme colors
+
+            Text(speed > 0 ? "\(Int(speed.rounded())) m/s" : "Calm")
+                .font(Theme.fontCaption) // Use Theme font
+                .foregroundColor(speed > 0 ? Theme.textPrimary : Theme.textSecondary) // Use Theme colors
         }
-        .padding(.horizontal, 10).padding(.vertical, 5)
-        .background(speed > 0 ? Color.blue.opacity(0.2) : Color.gray.opacity(0.2))
-        .cornerRadius(8)
+        .padding(.horizontal, Theme.spacingS).padding(.vertical, Theme.spacingXXS) // Use Theme spacing
+        .background(Theme.surface) // Use Theme surface for background
+        .cornerRadius(Theme.cornerRadiusS) // Use Theme radius
+        .overlay( // Add a subtle border
+            RoundedRectangle(cornerRadius: Theme.cornerRadiusS)
+                .stroke(Theme.divider.opacity(0.5), lineWidth: 0.5)
+        )
     }
 }
 
 
-// MARK: - Main Hole View (Corrected Default Score Logic)
+// MARK: - Main Hole View
 struct HoleView: View {
-    // --- Properties ---
     @Binding var hole: Hole
     @FocusState private var isApproachDistanceFocused: Bool
     @FocusState private var isFirstPuttDistanceFocused: Bool
-    // @StateObject private var locationManager = LocationManager() // REMOVED
-    // @State private var isLoadingWeather = false // REMOVED
-    // @State private var weatherError: String? = nil // REMOVED
-    @State private var showWindSettings = false // Keep this for manual wind settings
+    @State private var showWindSettings = false
 
-    // Club options
-    private let teeClubOptions = [
+    // Explicitly defined club options
+    private let teeClubOptions: [Club] = [
         Club(type: .driver, name: "Driver"), Club(type: .wood, name: "3W"), Club(type: .wood, name: "5W"),
         Club(type: .hybrid, name: "3H"), Club(type: .hybrid, name: "4H"),
         Club(type: .iron, name: "4i"), Club(type: .iron, name: "5i"), Club(type: .iron, name: "6i")
     ]
-    private let approachClubOptions = [
+    private let approachClubOptions: [Club] = [
         Club(type: .wood, name: "5W"), Club(type: .hybrid, name: "4H"),
         Club(type: .iron, name: "4i"), Club(type: .iron, name: "5i"), Club(type: .iron, name: "6i"),
         Club(type: .iron, name: "7i"), Club(type: .iron, name: "8i"), Club(type: .iron, name: "9i"),
@@ -51,45 +52,45 @@ struct HoleView: View {
     ]
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "GolfTracker", category: "HoleView")
 
-    // --- Main Body ---
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                holeHeaderSection // Contains Title, Par, Wind button, Impact
-                Divider()
-                teeShotSection    // Contains Tee Club, Fairway
-                Divider()
-                approachSection   // Contains Approach Dist/Club, Green Target/Putting
-                Divider()
-                scoreSection      // Contains Score buttons
+            // Increased vertical spacing between major sections
+            VStack(alignment: .leading, spacing: Theme.spacingL) {
+                holeHeaderSection
+                Theme.divider // Divider still useful for visual separation
+                teeShotSection
+                Theme.divider
+                approachSection
+                Theme.divider
+                scoreSection
+                    .padding(.bottom, Theme.spacingXS) // Add slight bottom padding to score section
             }
-            .padding() // Add padding once around the main VStack
-            .onAppear {
-                 // Initial setup when the view first appears (might be the first hole)
-                 setDefaultScoreIfNeeded()
-                 logger.info("HoleView appeared for hole \(hole.number).")
-            }
-            // *** Use onChange to detect when the specific hole changes ***
-            .onChange(of: hole.id) { // Triggered when navigating Next/Previous
-                logger.info("Hole changed to \(hole.number). Applying default score if needed.")
-                setDefaultScoreIfNeeded()
-            }
-            .toolbar { // Keep keyboard toolbar
+            .padding(Theme.spacingM)
+            .onAppear { setDefaultScoreIfNeeded(); logger.info("HoleView appeared for hole \(hole.number).") }
+            .onChange(of: hole.id) { logger.info("Hole changed to \(hole.number). Applying default."); setDefaultScoreIfNeeded() }
+            .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer(); Button("Done") { isApproachDistanceFocused = false; isFirstPuttDistanceFocused = false }
+                        .font(Theme.fontBody)
+                        .foregroundColor(Theme.accentSecondary)
                 }
             }
-            .sheet(isPresented: $showWindSettings) { // Keep manual wind settings sheet
-                 WindSettingsView(windSpeed: $hole.windSpeed, windDirection: $hole.windDirection, approachDistance: hole.approachDistance)
+            .sheet(isPresented: $showWindSettings) {
+                 WindSettingsView(
+                    windSpeed: $hole.windSpeed,
+                    windDirection: $hole.windDirection,
+                    approachDistance: hole.approachDistance
+                 )
                  .presentationDetents([.medium, .large])
             }
-        } // End ScrollView
-    } // End body
+        }
+        .background(Theme.background.ignoresSafeArea())
+        .navigationTitle("Hole \(hole.number)")
+        .navigationBarTitleDisplayMode(.inline)
+    }
 
-    // --- Function to Set Default Score ---
+    // Function to Set Default Score
     private func setDefaultScoreIfNeeded() {
-        // Set score to par ONLY if the current score is still 0 (or uninitialized)
-        // AND the par is valid (>0). This prevents overwriting a score the user already entered.
         if hole.score == 0 && hole.par > 0 {
              hole.score = hole.par
              logger.debug("Hole \(hole.number): Default score set to par (\(hole.par)).")
@@ -98,93 +99,106 @@ struct HoleView: View {
           }
     }
 
-
-    // --- Extracted Subview Sections ---
-
     // MARK: Hole Header Section
     private var holeHeaderSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Hole \(hole.number)")
-                .font(.largeTitle).fontWeight(.bold)
-            parSelectionView // Extracted Par selection
-            windSection      // Simplified Wind Section
-            // weatherStatusMessageView // REMOVED - No automatic weather/location status
-            windImpactDisplayView    // Keep wind impact based on manual/saved wind data
+        // Adjusted spacing within header
+        VStack(alignment: .leading, spacing: Theme.spacingM) {
+            parSelectionView
+            windSection
+            windImpactDisplayView
         }
     }
 
-    // Extracted Par Selection View
+    // Par Selection Buttons
     private var parSelectionView: some View {
-        HStack {
-            Text("Par:").font(.headline)
+        HStack(spacing: Theme.spacingXS) {
+            Text("Par:").font(Theme.fontHeadline).foregroundColor(Theme.textPrimary)
             ForEach([3, 4, 5], id: \.self) { parValue in
                 Button {
                      hole.par = parValue
-                     // Also reset score to new par if score hasn't been manually changed from previous par default
-                     if hole.score == 0 || getScoreOptions(for: hole.par).contains(hole.score) { // Check if score is still default-like
-                          hole.score = parValue
-                     }
+                     if hole.score == 0 { hole.score = parValue }
                 } label: {
-                    Text("\(parValue)").padding(.horizontal, 12).padding(.vertical, 6)
-                        .background(hole.par == parValue ? Color.green : Color.gray.opacity(0.2))
-                        .foregroundColor(hole.par == parValue ? .white : .primary).cornerRadius(8)
+                    Text("\(parValue)")
+                        .fontWeight(.medium).font(Theme.fontBody)
+                        .padding(.horizontal, Theme.spacingS).padding(.vertical, Theme.spacingXXS)
+                        .background(hole.par == parValue ? Theme.accentSecondary : Theme.surface)
+                        .foregroundColor(hole.par == parValue ? Theme.textOnAccent : Theme.textPrimary)
+                        .cornerRadius(Theme.cornerRadiusS)
+                        .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadiusS).stroke(Theme.divider))
                 }
             }
         }
     }
 
-    // Extracted (and Simplified) Wind Section View
+    // Wind Button/Indicator
     private var windSection: some View {
          HStack(alignment: .center) {
-             Text("Wind:").font(.subheadline)
-             // Button to open manual wind settings
+             Text("Wind:").font(Theme.fontSubheadline).foregroundColor(Theme.textSecondary)
              Button { showWindSettings = true } label: {
                  WindIndicatorView(speed: hole.windSpeed, direction: hole.windDirection)
              }
-             Spacer() // Keep spacer to align indicator left
-             // "Current" button and ProgressView REMOVED
+             Spacer()
          }
     }
 
-    // Extracted Wind Impact Display View
+    // Wind Impact Display
      @ViewBuilder
      private var windImpactDisplayView: some View {
          if let distance = hole.approachDistance, distance > 0 {
-             let impact = calculateWindImpact(distance: distance) // Use the instance method
-             if abs(impact) > 0 {
-                 HStack {
+             let impact = WindCalculator.calculateImpact(distance: distance, windSpeed: hole.windSpeed, windDirection: Double(hole.windDirection))
+             if impact != 0 {
+                 HStack(spacing: Theme.spacingXXS) {
                      Image(systemName: impact > 0 ? "arrow.up.circle.fill" : "arrow.down.circle.fill")
-                         .foregroundColor(impact > 0 ? .green : .red)
+                         .foregroundColor(impact > 0 ? Theme.positive : Theme.negative)
                      Text("Wind \(impact > 0 ? "helps" : "hurts") by \(abs(impact))m.")
-                         .font(.caption)
+                         .font(Theme.fontCaption)
+                         .foregroundColor(Theme.textSecondary)
                      Spacer()
-                     Text("Effective: \(distance + impact)m")
-                         .font(.caption.weight(.medium))
+                     Text("Plays like: \(distance + impact)m")
+                         .font(Theme.fontCaptionBold)
+                         .foregroundColor(Theme.textPrimary)
                  }
-                 .padding(8).background(Color.gray.opacity(0.1)).cornerRadius(6)
+                 .padding(Theme.spacingXS)
+                 .background(Theme.surface)
+                 .cornerRadius(Theme.cornerRadiusS)
              }
-         } // Implicitly returns EmptyView if no conditions met
+         }
      }
 
 
     // MARK: Tee Shot Section
     private var teeShotSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Tee Shot").font(.headline)
+        // Adjusted spacing within section
+        VStack(alignment: .leading, spacing: Theme.spacingM) {
+            Text("Tee Shot").font(Theme.fontHeadline).foregroundColor(Theme.textPrimary)
+            // Tee Club Menu
             HStack {
-                Text("Club:").font(.subheadline); Spacer()
+                Text("Club:").font(Theme.fontSubheadline).foregroundColor(Theme.textSecondary)
+                Spacer()
                 Menu {
-                    ForEach(teeClubOptions) { club in Button(club.name) { hole.teeClub = club } }
-                    Button("Clear") { hole.teeClub = nil }
+                    ForEach(teeClubOptions) { club in
+                        Button(club.name) { hole.teeClub = club }
+                    }
+                    Button("Clear", role: .destructive) { hole.teeClub = nil }
                 } label: {
-                    HStack { Text(hole.teeClub?.name ?? "Select Club").foregroundColor(hole.teeClub == nil ? .secondary : .primary); Image(systemName: "chevron.down") }
-                    .padding(.horizontal, 12).padding(.vertical, 6).background(Color.gray.opacity(0.1)).cornerRadius(8)
+                    HStack(spacing: Theme.spacingXXS) {
+                        Text(hole.teeClub?.name ?? "Select")
+                            .font(Theme.fontBody)
+                            .foregroundColor(hole.teeClub == nil ? Theme.textSecondary : Theme.textPrimary)
+                        Image(systemName: "chevron.down").font(Theme.fontCaption)
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    .padding(.horizontal, Theme.spacingS).padding(.vertical, Theme.spacingXXS)
+                    .background(Theme.surface)
+                    .cornerRadius(Theme.cornerRadiusS)
+                    .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadiusS).stroke(Theme.divider))
                 }
             }
+            // Fairway Hit/Miss (Par 4/5)
             if !hole.isPar3 {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Fairway:").font(.subheadline)
-                    HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: Theme.spacingXS) {
+                    Text("Fairway:").font(Theme.fontSubheadline).foregroundColor(Theme.textSecondary)
+                    HStack(spacing: Theme.spacingXS) {
                         fairwayButton(label: "Left", hit: false, direction: .left)
                         fairwayButton(label: "Hit", hit: true, direction: .none)
                         fairwayButton(label: "Right", hit: false, direction: .right)
@@ -196,162 +210,427 @@ struct HoleView: View {
 
     // MARK: Approach Section
     private var approachSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Approach Shot").font(.headline)
+        // Adjusted spacing within section
+        VStack(alignment: .leading, spacing: Theme.spacingM) {
+            Text("Approach / Green").font(Theme.fontHeadline).foregroundColor(Theme.textPrimary)
+            // Approach Distance
             HStack {
-                Text("Distance:").font(.subheadline)
-                distanceInput(value: $hole.approachDistance, placeholder: "Meters", focusState: $isApproachDistanceFocused)
+                Text("Approach Dist:").font(Theme.fontSubheadline).foregroundColor(Theme.textSecondary)
+                Spacer()
+                distanceInput(value: $hole.approachDistance, placeholder: "meters", focusState: $isApproachDistanceFocused)
             }
+            // Approach Club
             HStack {
-                Text("Club:").font(.subheadline); Spacer()
+                Text("Approach Club:").font(Theme.fontSubheadline).foregroundColor(Theme.textSecondary)
+                Spacer()
                 Menu {
-                    ForEach(approachClubOptions) { club in Button(club.name) { hole.approachClub = club } }
-                    Button("Clear") { hole.approachClub = nil }
+                    ForEach(approachClubOptions) { club in
+                        Button(club.name) { hole.approachClub = club }
+                    }
+                    Button("Clear", role: .destructive) { hole.approachClub = nil }
                 } label: {
-                    HStack { Text(hole.approachClub?.name ?? "Select Club").foregroundColor(hole.approachClub == nil ? .secondary : .primary); Image(systemName: "chevron.down") }
-                    .padding(.horizontal, 12).padding(.vertical, 6).background(Color.gray.opacity(0.1)).cornerRadius(8)
+                     HStack(spacing: Theme.spacingXXS) {
+                        Text(hole.approachClub?.name ?? "Select")
+                            .font(Theme.fontBody)
+                            .foregroundColor(hole.approachClub == nil ? Theme.textSecondary : Theme.textPrimary)
+                        Image(systemName: "chevron.down").font(Theme.fontCaption)
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    .padding(.horizontal, Theme.spacingS).padding(.vertical, Theme.spacingXXS)
+                    .background(Theme.surface)
+                    .cornerRadius(Theme.cornerRadiusS)
+                    .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadiusS).stroke(Theme.divider))
                 }
             }
-            greenTargetAndPuttingSection
+            // Green Target and Putting Area
+            greenTargetAndPuttingSection // Spacing adjusted inside this view
         }
     }
 
-     // Extracted Green Target and Putting HStack content
-     private var greenTargetAndPuttingSection: some View {
-         HStack(alignment: .top, spacing: 20) {
-             VStack(alignment: .center, spacing: 6) {
-                 Text("Green Result:").font(.subheadline)
+    // Combined Green Target and Putting Inputs
+    private var greenTargetAndPuttingSection: some View {
+         // Adjusted spacing
+         HStack(alignment: .top, spacing: Theme.spacingL) {
+             // Green Target Area
+             VStack(alignment: .center, spacing: Theme.spacingS) {
+                 Text("Green Result").font(Theme.fontSubheadline).foregroundColor(Theme.textSecondary)
                  ImprovedGreenTargetView(selectedLocation: $hole.greenHitLocation)
-                     .frame(width: 160, height: 160)
+                     .frame(width: 150, height: 150)
+                 Text(selectedLocationDescription)
+                    .font(Theme.fontCaption)
+                    .foregroundColor(Theme.textSecondary)
+                    .frame(height: 30) // Keep height to prevent layout shifts
+                    .multilineTextAlignment(.center)
              }
              .frame(maxWidth: .infinity)
-             VStack(alignment: .leading, spacing: 10) {
-                 Text("Putting:").font(.headline)
-                 VStack(alignment: .leading, spacing: 6){
-                     Text("Putts:").font(.subheadline)
-                     HStack {
+
+             // Putting Area
+             VStack(alignment: .leading, spacing: Theme.spacingL) {
+                 Text("Putting").font(Theme.fontSubheadline).foregroundColor(Theme.textSecondary)
+                 // Number of Putts
+                 VStack(alignment: .leading, spacing: Theme.spacingXS) {
+                     Text("Number of Putts:").font(Theme.fontCaption).foregroundColor(Theme.textSecondary)
+                     HStack(spacing: Theme.spacingXS) {
                          ForEach(0...4, id: \.self) { putts in
                              Button { hole.putts = putts } label: {
-                                 Text("\(putts)").frame(width: 35, height: 35).background(hole.putts == putts ? Color.blue : Color.gray.opacity(0.2))
-                                     .foregroundColor(hole.putts == putts ? .white : .primary).clipShape(Circle())
+                                 Text("\(putts)")
+                                    .font(Theme.fontBody)
+                                    .frame(minWidth: 32, minHeight: 32)
+                                    .padding(Theme.spacingXXS)
+                                    .background(hole.putts == putts ? Theme.accentSecondary : Theme.surface)
+                                    .foregroundColor(hole.putts == putts ? Theme.textOnAccent : Theme.textPrimary)
+                                    .clipShape(Circle())
+                                    .overlay(Circle().stroke(Theme.divider))
                              }
                          }
                      }
                  }
-                 VStack(alignment: .leading, spacing: 6) {
-                     Text("First Putt Dist:").font(.subheadline)
-                     distanceInput(value: $hole.firstPuttDistance, placeholder: "Feet", focusState: $isFirstPuttDistanceFocused)
+                 // First Putt Distance
+                 VStack(alignment: .leading, spacing: Theme.spacingXS) {
+                     Text("First Putt Dist:").font(Theme.fontCaption).foregroundColor(Theme.textSecondary)
+                     distanceInput(value: $hole.firstPuttDistance, placeholder: "feet", focusState: $isFirstPuttDistanceFocused)
                  }
              }
              .frame(maxWidth: .infinity)
          }
      }
 
+    // Description for selected green location
+    private var selectedLocationDescription: String {
+        switch hole.greenHitLocation {
+            case .center: return "Green in Reg"
+            case .longLeft: return "Missed Long Left"
+            case .long: return "Missed Long"
+            case .longRight: return "Missed Long Right"
+            case .left: return "Missed Left"
+            case .right: return "Missed Right"
+            case .shortLeft: return "Missed Short Left"
+            case .short: return "Missed Short"
+            case .shortRight: return "Missed Short Right"
+        }
+    }
+
     // MARK: Score Section
     private var scoreSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Score for Hole \(hole.number):").font(.headline)
+        VStack(alignment: .leading, spacing: Theme.spacingS) {
+            Text("Score").font(Theme.fontHeadline).foregroundColor(Theme.textPrimary)
             let scoreOptions = getScoreOptions(for: hole.par)
-            HStack(spacing: 6) {
-                ForEach(scoreOptions, id: \.self) { score in
-                    Button { hole.score = score } label: {
-                        Text(scoreString(for: score, par: hole.par)).fontWeight(.medium).frame(maxWidth: .infinity).padding(.vertical, 10)
-                            .background(hole.score == score ? scoreColor(for: score, par: hole.par) : Color.gray.opacity(0.2))
-                            .foregroundColor(hole.score == score ? .white : .primary).cornerRadius(8)
+            HStack(spacing: Theme.spacingXS) {
+                ForEach(scoreOptions, id: \.self) { scoreValue in
+                    Button { hole.score = scoreValue } label: {
+                        Text(scoreString(for: scoreValue, par: hole.par))
+                            .fontWeight(hole.score == scoreValue ? .semibold : .medium)
+                            .font(Theme.fontBody)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Theme.spacingS)
+                            .background(hole.score == scoreValue ? scoreColor(for: scoreValue, par: hole.par) : Theme.surface)
+                            .foregroundColor(hole.score == scoreValue ? foregroundColorForScore(scoreValue, par: hole.par) : Theme.textPrimary)
+                            .cornerRadius(Theme.cornerRadiusS)
+                            .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadiusS).stroke(Theme.divider))
+                            .shadow(color: hole.score == scoreValue ? Theme.neutral.opacity(0.15) : .clear,
+                                   radius: Theme.cornerRadiusS / 2, x: 0, y: 2)
+
                     }
                 }
             }
         }
     }
 
+    // MARK: - Helper Views/Functions
 
-    // --- Helper Views/Functions ---
-
+    // Reusable Distance Input TextField
     private func distanceInput(value: Binding<Int?>, placeholder: String, focusState: FocusState<Bool>.Binding) -> some View {
         TextField(placeholder, value: value, format: .number)
-            .keyboardType(.numberPad).padding(8).background(Color(.systemGray6)).cornerRadius(8)
-            .focused(focusState).frame(width: 100)
+            .keyboardType(.numberPad)
+            .font(Theme.fontBody)
+            .padding(Theme.spacingXS)
+            .background(Theme.surface)
+            .cornerRadius(Theme.cornerRadiusS)
+            .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadiusS).stroke(Theme.divider))
+            .focused(focusState)
+            .frame(width: 80)
+            .multilineTextAlignment(.trailing)
     }
 
+    // Reusable Fairway Button
     private func fairwayButton(label: String, hit: Bool?, direction: FairwayMissDirection) -> some View {
-        Button {
+        let isSelected = (hole.fairwayHit == hit) && (hit == true || hole.fairwayMissDirection == direction)
+        let bgColor = isSelected ? (hit == true ? Theme.positive : Theme.warning) : Theme.surface
+        let fgColor = isSelected ? Theme.textOnAccent : Theme.textPrimary
+
+        return Button {
             hole.fairwayHit = hit
             hole.fairwayMissDirection = (hit == false) ? direction : .none
         } label: {
-            Text(label).fontWeight(.medium).frame(maxWidth: .infinity).padding(.vertical, 8)
-                .background(fairwayButtonColor(hit: hit, direction: direction))
-                .foregroundColor(fairwayButtonForegroundColor(hit: hit, direction: direction)).cornerRadius(8)
+            Text(label)
+                .fontWeight(.medium).font(Theme.fontBody)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, Theme.spacingXS)
+                .background(bgColor)
+                .foregroundColor(fgColor)
+                .cornerRadius(Theme.cornerRadiusS)
+                .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadiusS).stroke(Theme.divider))
         }
     }
 
-    private func fairwayButtonColor(hit: Bool?, direction: FairwayMissDirection) -> Color {
-        let isSelected: Bool = (hit == true && hole.fairwayHit == true) || (hit == false && hole.fairwayHit == false && hole.fairwayMissDirection == direction)
-        return isSelected ? (hit == true ? .green : .orange) : Color.gray.opacity(0.2)
-    }
-     private func fairwayButtonForegroundColor(hit: Bool?, direction: FairwayMissDirection) -> Color {
-         let isSelected: Bool = (hit == true && hole.fairwayHit == true) || (hit == false && hole.fairwayHit == false && hole.fairwayMissDirection == direction)
-         return isSelected ? .white : .primary
-     }
-
     // MARK: Score Helpers
-    private func getScoreOptions(for par: Int) -> [Int] { guard par >= 3 else { return [1, 2, 3, 4, 5] }; let base = par - 2; return (max(1, base)...par + 3).map { $0 } }
-    private func scoreString(for score: Int, par: Int) -> String { guard par > 0 else { return "\(score)" }; let diff = score - par; if score == 1 { return "Ace!" }; if diff < -2 { return "\(diff)" }; if diff == -2 { return "Eagle" }; if diff == -1 { return "Birdie" }; if diff == 0 { return "Par" }; if diff == 1 { return "Bogey" }; if diff == 2 { return "Dbl" }; return "+\(diff)" }
-    private func scoreColor(for score: Int, par: Int) -> Color { guard par > 0 else { return .gray }; let diff = score - par; if score == 1 { return .yellow }; if diff <= -2 { return .purple }; if diff == -1 { return .red }; if diff == 0 { return .green }; if diff == 1 { return .blue }; return diff == 2 ? .gray : .black.opacity(0.8) }
-    func calculateWindImpact(distance: Int) -> Int { return WindCalculator.calculateImpact(distance: distance, windSpeed: hole.windSpeed, windDirection: Double(hole.windDirection)) }
+
+    // Generate score options around par
+    private func getScoreOptions(for par: Int) -> [Int] {
+        guard par >= 3 else { return [1, 2, 3, 4, 5] }
+        let lowerBound = max(1, par - 3)
+        let upperBound = par + 3
+        return Array(lowerBound...upperBound)
+    }
+
+    // Get text label for score (e.g., "Birdie", "Par", "+2")
+    private func scoreString(for score: Int, par: Int) -> String {
+        guard par > 0 else { return "\(score)" }
+        if score == 1 { return "Ace!" }
+        let diff = score - par
+        switch diff {
+            case ..<(-2): return "\(diff)"
+            case -2: return "Eagle"
+            case -1: return "Birdie"
+            case 0:  return "Par"
+            case 1:  return "Bogey"
+            case 2:  return "Double"
+            default: return "+\(diff)"
+        }
+    }
+
+    // Get background color for score button
+    private func scoreColor(for score: Int, par: Int) -> Color {
+        guard par > 0 else { return Theme.neutral }
+        if score == 1 { return Theme.warning }
+        let diff = score - par
+        switch diff {
+            case ..<(-1): return Theme.accentPrimary
+            case -1: return Theme.negative
+            case 0:  return Theme.accentSecondary
+            case 1:  return Theme.neutral
+            default: return Theme.textPrimary.opacity(0.7)
+        }
+    }
+
+    // Get foreground color for score button text (for contrast)
+    private func foregroundColorForScore(_ score: Int, par: Int) -> Color {
+        let bgColor = scoreColor(for: score, par: par)
+        if bgColor == Theme.neutral || bgColor == Theme.textPrimary.opacity(0.7) || bgColor == Theme.accentPrimary || bgColor == Theme.accentSecondary || bgColor == Theme.negative {
+            return .white // Use white on darker/colored backgrounds
+        } else {
+            return Theme.textPrimary // Use primary text on lighter backgrounds (like Yellow/Warning)
+        }
+    }
 
 } // End HoleView
 
 
-// MARK: - Supporting Views Defined Locally
+// MARK: - Supporting Views Defined Locally (WindSettingsView, ImprovedGreenTargetView)
 
-// Wind settings sheet
+// Wind settings sheet View
 struct WindSettingsView: View {
     @Binding var windSpeed: Double
     @Binding var windDirection: Int
     let approachDistance: Int?
     @Environment(\.dismiss) var dismiss
 
+    private let vizSize: CGFloat = 120
+    private let arrowSize: CGFloat = 20
+
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                directionPickerSection
-                speedSliderSection
-                visualizerContainer
-                windImpactPreview
-                Spacer()
+            ScrollView {
+                VStack(spacing: Theme.spacingL) {
+                    directionPickerSection
+                    speedSliderSection
+                    visualizerContainer
+                        .padding(.vertical, Theme.spacingS)
+                    windImpactPreview
+                    Spacer(minLength: 20)
+                }
+                .padding(Theme.spacingM)
             }
-            .padding().navigationTitle("Wind Settings").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .navigationTitle("Wind Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .font(Theme.fontBodySemibold)
+                        .foregroundColor(Theme.accentSecondary)
+                }
+            }
+            .background(Theme.background.ignoresSafeArea())
         }
     }
 
-    private var directionPickerSection: some View { VStack(alignment: .leading, spacing: 8) { Text("Wind Direction (From):").font(.subheadline); Picker("Direction", selection: $windDirection) { Text("N").tag(0); Text("NE").tag(45); Text("E").tag(90); Text("SE").tag(135); Text("S").tag(180); Text("SW").tag(225); Text("W").tag(270); Text("NW").tag(315) }.pickerStyle(SegmentedPickerStyle()) } }
-    private var speedSliderSection: some View { VStack(alignment: .leading, spacing: 8) { Text("Wind Speed: \(Int(windSpeed.rounded())) m/s").font(.subheadline); Slider(value: $windSpeed, in: 0...25, step: 1) } }
-    private var visualizerContainer: some View { ZStack { backgroundCircle; rotatingArrow; centerDot; directionLabels }.frame(height: 140) }
-    private var backgroundCircle: some View { Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1).frame(width: 100, height: 100) }
-    private var rotatingArrow: some View { Image(systemName: "location.north.fill").resizable().scaledToFit().frame(width: 20).rotationEffect(.degrees(Double(windDirection))).offset(y: -35).rotationEffect(.degrees(Double(windDirection))) }
-    private var centerDot: some View { Circle().fill(Color.white).frame(width: 10, height: 10) }
-    private var directionLabels: some View { ForEach([("N", 0), ("E", 90), ("S", 180), ("W", 270)], id: \.0) { labelData in Text(labelData.0).font(.caption).foregroundColor(.secondary).offset(y: -60).rotationEffect(.degrees(Double(-labelData.1))).rotationEffect(.degrees(Double(labelData.1))) } }
-    @ViewBuilder private var windImpactPreview: some View { if let distance = approachDistance, distance > 0 { let impact = WindCalculator.calculateImpact(distance: distance, windSpeed: windSpeed, windDirection: Double(windDirection)); VStack(spacing: 4) { Text("Estimated Impact on \(distance)m shot").font(.subheadline); Text("Plays like: \(distance + impact)m").font(.headline).foregroundColor(impact > 0 ? .green : (impact < 0 ? .red : .primary)); Text(impact > 5 ? "Wind Helping" : (impact < -5 ? "Wind Hurting" : "Minimal Effect")).font(.caption).foregroundColor(.secondary) }.padding().background(Color.gray.opacity(0.1)).cornerRadius(8) } else { Text("Enter approach distance to see impact.").font(.caption).foregroundColor(.secondary) } }
+    // Direction Picker
+    private var directionPickerSection: some View {
+        VStack(alignment: .leading, spacing: Theme.spacingXS) {
+            Text("Wind Direction (Blowing From):")
+                .font(Theme.fontSubheadline).foregroundColor(Theme.textSecondary)
+            Picker("Direction", selection: $windDirection) {
+                Text("N").tag(0); Text("NE").tag(45); Text("E").tag(90); Text("SE").tag(135);
+                Text("S").tag(180); Text("SW").tag(225); Text("W").tag(270); Text("NW").tag(315)
+            }
+            .pickerStyle(.segmented)
+            .tint(Theme.accentSecondary)
+        }
+    }
+
+    // Speed Slider
+    private var speedSliderSection: some View {
+        VStack(alignment: .leading, spacing: Theme.spacingXS) {
+            Text("Wind Speed: \(Int(windSpeed.rounded())) m/s")
+                .font(Theme.fontSubheadline).foregroundColor(Theme.textSecondary)
+            Slider(value: $windSpeed, in: 0...25, step: 1)
+                .tint(Theme.accentSecondary)
+        }
+    }
+
+    // Wind Visualizer
+    private var visualizerContainer: some View {
+        ZStack {
+            Circle().stroke(Theme.divider, lineWidth: 1)
+                .frame(width: vizSize, height: vizSize)
+
+            ForEach([("N", 0.0), ("E", 90.0), ("S", 180.0), ("W", 270.0)], id: \.0) { labelData in
+                Text(labelData.0)
+                    .font(Theme.fontCaption2).foregroundColor(Theme.textSecondary)
+                    .offset(y: -(vizSize / 2 + 10))
+                    .rotationEffect(.degrees(-labelData.1))
+                    .rotationEffect(.degrees(labelData.1))
+            }
+
+            Image(systemName: "location.north.fill")
+                .resizable().scaledToFit()
+                .frame(width: arrowSize)
+                .foregroundColor(Theme.accentSecondary)
+                .rotationEffect(.degrees(Double(windDirection)))
+                .offset(y: -(vizSize / 2 - arrowSize / 2 - 5))
+                .rotationEffect(.degrees(Double(windDirection)))
+        }
+        .frame(height: vizSize + 30)
+    }
+
+    // Wind Impact Preview Text
+    @ViewBuilder private var windImpactPreview: some View {
+        VStack(alignment: .leading, spacing: Theme.spacingXS) {
+             Text("Estimated Impact").font(Theme.fontHeadline).foregroundColor(Theme.textPrimary)
+             if let distance = approachDistance, distance > 0 {
+                 let impact = WindCalculator.calculateImpact(distance: distance, windSpeed: windSpeed, windDirection: Double(windDirection))
+                 Text("On \(distance)m shot:").font(Theme.fontSubheadline).foregroundColor(Theme.textSecondary)
+                 HStack {
+                      Text("Plays like: \(distance + impact)m")
+                           .font(Theme.fontBodySemibold)
+                           .foregroundColor(impact > 0 ? Theme.positive : (impact < 0 ? Theme.negative : Theme.textPrimary))
+                      Spacer()
+                      Text(impactDescription(impact: impact))
+                           .font(Theme.fontCaption).foregroundColor(Theme.textSecondary)
+                 }
+
+             } else {
+                 Text("Enter approach distance in Hole view to see estimated impact.")
+                    .font(Theme.fontCaption).foregroundColor(Theme.textSecondary)
+             }
+        }
+         .padding(Theme.spacingM)
+         .frame(maxWidth: .infinity, alignment: .leading)
+         .background(Theme.surface)
+         .cornerRadius(Theme.cornerRadiusM)
+    }
+
+    // Helper for impact description text
+    private func impactDescription(impact: Int) -> String {
+        let absImpact = abs(impact)
+        if impact > 5 { return "Helping (\(absImpact)m+)" }
+        else if impact > 0 { return "Helping (\(absImpact)m)" }
+        else if impact < -5 { return "Hurting (\(absImpact)m+)" }
+        else if impact < 0 { return "Hurting (\(absImpact)m)" }
+        else { return "Minimal Wind Effect" }
+    }
 }
 
-
-// Improved GreenTargetView
+// Improved Green Target View
 struct ImprovedGreenTargetView: View {
     @Binding var selectedLocation: GreenHitLocation
-    let locations: [[GreenHitLocation]] = [ [.longLeft, .long, .longRight], [.left, .center, .right], [.shortLeft, .short, .shortRight] ]
-    var body: some View { VStack(spacing: 2) { ForEach(0..<3, id: \.self) { row in HStack(spacing: 2) { ForEach(0..<3, id: \.self) { col in let location = locations[row][col]; locationButton(for: location) } } } }.background(Color.black.opacity(0.1)).cornerRadius(8) }
-    private func locationButton(for location: GreenHitLocation) -> some View { Button { selectedLocation = location } label: { ZStack { Rectangle().fill(locationColor(location)).aspectRatio(1, contentMode: .fit); if location == .center { centerMarkerView }; Text(directionText(for: location)).font(.system(size: 10)).foregroundColor(.white).fontWeight(selectedLocation == location ? .bold : .regular) } } }
-    private var centerMarkerView: some View { Circle().stroke(Color.white.opacity(0.7), lineWidth: 2).padding(8) }
-    private func locationColor(_ location: GreenHitLocation) -> Color { location == selectedLocation ? (location == .center ? Color.green : .orange) : Color.gray.opacity(0.3) }
-    private func directionText(for location: GreenHitLocation) -> String { switch location { case .center: return "GIR"; case .longLeft: return "L/L"; case .long: return "Long"; case .longRight: return "L/R"; case .left: return "Left"; case .right: return "Right"; case .shortLeft: return "S/L"; case .short: return "Short"; case .shortRight: return "S/R" } }
-}
+    let locations: [[GreenHitLocation]] = [
+        [.longLeft, .long, .longRight],
+        [.left, .center, .right],
+        [.shortLeft, .short, .shortRight]
+    ]
 
+    var body: some View {
+        Grid(horizontalSpacing: 2, verticalSpacing: 2) {
+            ForEach(0..<3, id: \.self) { row in
+                GridRow {
+                    ForEach(0..<3, id: \.self) { col in
+                        let location = locations[row][col]
+                        locationButton(for: location)
+                    }
+                }
+            }
+        }
+        .background(Theme.divider.opacity(0.5))
+        .cornerRadius(Theme.cornerRadiusS)
+        .aspectRatio(1, contentMode: .fit)
+    }
+
+    private func locationButton(for location: GreenHitLocation) -> some View {
+        Button { selectedLocation = location } label: {
+            ZStack {
+                Rectangle().fill(locationColor(location))
+                    .aspectRatio(1, contentMode: .fit)
+                if location == .center { centerMarkerView }
+                Text(directionText(for: location))
+                    .font(Theme.fontCaption2)
+                    .foregroundColor(Theme.textOnAccent)
+                    .fontWeight(selectedLocation == location ? .bold : .regular)
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var centerMarkerView: some View {
+        Circle()
+            .stroke(Color.white.opacity(0.6), lineWidth: 1.5)
+            .padding(Theme.spacingXXS)
+    }
+
+    private func locationColor(_ location: GreenHitLocation) -> Color {
+        guard selectedLocation == location else { return Theme.neutral.opacity(0.4) }
+        return location == .center ? Theme.positive : Theme.warning
+    }
+
+    private func directionText(for location: GreenHitLocation) -> String {
+        switch location {
+            case .center: return "GIR"; case .longLeft: return "L/L"; case .long: return "Long"
+            case .longRight: return "L/R"; case .left: return "Left"; case .right: return "Right"
+            case .shortLeft: return "S/L"; case .short: return "Short"; case .shortRight: return "S/R"
+        }
+    }
+}
 
 // MARK: - Previews
 #if DEBUG
 struct HoleView_Previews: PreviewProvider {
-     @State static var previewHole: Hole = { var hole = Hole(number: 1, par: 4); if let sampleRound = SampleData.sampleRounds.first, let sampleHole = sampleRound.holes.first { hole = sampleHole }; hole.score = hole.par; hole.approachDistance = 150; hole.windSpeed = 5; hole.windDirection = 270; return hole }()
-     static var previews: some View { NavigationView { HoleView(hole: $previewHole) } }
+     @State static var previewHole: Hole = {
+        var hole = Hole(number: 7, par: 3)
+        hole.approachDistance = 155
+        hole.windSpeed = 8
+        hole.windDirection = 45
+        hole.score = 3
+        hole.teeClub = Club.allClubs.first(where: {$0.name == "7 Iron"}) ?? Club(type: .iron, name: "7 Iron")
+        hole.greenHitLocation = .center
+        hole.putts = 2
+        return hole
+     }()
+
+     static var previews: some View {
+         NavigationView { HoleView(hole: $previewHole) }
+     }
  }
 #endif
+// --- END OF FILE GolfTracker.swiftpm/Sources/Views/HoleView.swift ---

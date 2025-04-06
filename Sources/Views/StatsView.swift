@@ -1,255 +1,296 @@
+// --- START OF FILE GolfTracker.swiftpm/Sources/Views/StatsView.swift ---
 
-// File: Sources/Views/StatsView.swift
 import SwiftUI
-import Charts // Import Charts
-import OSLog // Assuming you might want logging here too
+import Charts
+import OSLog
 
 struct StatsView: View {
-    let statistics: Statistics
-
-    // Define colors for charts and UI elements
-    let primaryColor = Color.green // Or Color(hex:"18A558")
-    let secondaryColor = Color.blue
-    let tertiaryColor = Color.orange
-    let quaternaryColor = Color(hex: "5F6B7A") // Greyish blue
-    let backgroundColor = Color(.systemGroupedBackground) // Standard grouped background
-    let cardBackgroundColor = Color(.secondarySystemGroupedBackground) // Background for cards
-
+    let statistics: Statistics // Passed in from HomeView
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "GolfTracker", category: "StatsView")
 
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) { // Increased spacing
+        ScrollView {
+            VStack(alignment: .leading, spacing: Theme.spacingL) { // Use Theme spacing
+                // --- Trend Charts Section ---
+                VStack(alignment: .leading, spacing: Theme.spacingS) { // Added spacing
+                     Text("Performance Trends")
+                         .font(Theme.fontTitle2) // Use Theme font
+                         .padding(.horizontal, Theme.spacingM) // Use Theme spacing
+                    trendChartSection // Extracted chart section view
+                }
+                 .padding(.bottom, Theme.spacingM) // Padding after charts
 
-                    // --- Trend Charts ---
-                    VStack(alignment: .leading) {
-                         Text("Performance Trends")
-                             .font(.title2).bold()
-                             .padding(.horizontal)
-                        trendChartSection // Extracted chart section
-                    }
-                     .padding(.bottom) // Add padding after charts
+                // --- Detailed Stat Sections Header ---
+                Text("Detailed Statistics")
+                    .font(Theme.fontTitle2) // Use Theme font
+                    .padding(.horizontal, Theme.spacingM) // Use Theme spacing
 
-                    // --- Detailed Stat Sections ---
-                    Text("Detailed Statistics")
-                        .font(.title2).bold()
-                        .padding(.horizontal)
+                // --- Reusable Stat Sections ---
+                // Pass Theme.surface for the card background color
+                StatSectionView(title: "Overall Averages", backgroundColor: Theme.surface) {
+                    StatItemView(label: "Avg Score (18 holes)", value: formatStatValue(statistics.averageScore, format: "%.1f"))
+                    StatItemView(label: "GIR %", value: formatStatValue(statistics.girPercentage, format: "%.1f%%"))
+                    StatItemView(label: "Fairways Hit %", value: formatStatValue(statistics.fairwayHitPercentage, format: "%.1f%%"))
+                    StatItemView(label: "Avg Putts / Hole", value: formatStatValue(statistics.averagePuttsPerHole, format: "%.2f"))
+                    StatItemView(label: "Avg Putts / Round", value: formatStatValue(statistics.averagePuttsPerRound, format: "%.1f"))
+                     Theme.divider.padding(.vertical, Theme.spacingXXS) // Add divider within section
+                     StatItemView(label: "Total Rounds", value: "\(statistics.totalRounds)")
+                     StatItemView(label: "Total Holes", value: "\(statistics.totalHolesPlayed)")
+                }
 
-                    StatSectionView(title: "Overall Averages", backgroundColor: cardBackgroundColor) {
-                        StatItemView(label: "Avg Score (18 holes)", value: formatStatValue(statistics.averageScore, format: "%.1f"))
-                        StatItemView(label: "GIR %", value: formatStatValue(statistics.girPercentage, format: "%.1f%%"))
-                        StatItemView(label: "Fairways Hit %", value: formatStatValue(statistics.fairwayHitPercentage, format: "%.1f%%"))
-                        StatItemView(label: "Avg Putts / Hole", value: formatStatValue(statistics.averagePuttsPerHole, format: "%.2f"))
-                        StatItemView(label: "Avg Putts / Round", value: formatStatValue(statistics.averagePuttsPerRound, format: "%.1f"))
-                         StatItemView(label: "Total Rounds", value: "\(statistics.totalRounds)")
-                         StatItemView(label: "Total Holes", value: "\(statistics.totalHolesPlayed)")
-                    }
+                StatSectionView(title: "Performance by Par", backgroundColor: Theme.surface) {
+                    StatItemView(label: "Avg Score Par 3", value: formatStatValue(statistics.avgScorePar3, format: "%.2f"))
+                    StatItemView(label: "Avg Score Par 4", value: formatStatValue(statistics.avgScorePar4, format: "%.2f"))
+                    StatItemView(label: "Avg Score Par 5", value: formatStatValue(statistics.avgScorePar5, format: "%.2f"))
+                    Theme.divider.padding(.vertical, Theme.spacingXXS)
+                    StatItemView(label: "Avg Putts Par 3", value: formatStatValue(statistics.avgPuttsPar3, format: "%.2f"))
+                    StatItemView(label: "Avg Putts Par 4", value: formatStatValue(statistics.avgPuttsPar4, format: "%.2f"))
+                    StatItemView(label: "Avg Putts Par 5", value: formatStatValue(statistics.avgPuttsPar5, format: "%.2f"))
+                    Theme.divider.padding(.vertical, Theme.spacingXXS)
+                     StatItemView(label: "GIR % Par 3", value: formatStatValue(statistics.girPercentagePar3, format: "%.1f%%"))
+                }
 
-                    StatSectionView(title: "Performance by Par", backgroundColor: cardBackgroundColor) {
-                        StatItemView(label: "Avg Score Par 3", value: formatStatValue(statistics.avgScorePar3, format: "%.2f"))
-                        StatItemView(label: "Avg Score Par 4", value: formatStatValue(statistics.avgScorePar4, format: "%.2f"))
-                        StatItemView(label: "Avg Score Par 5", value: formatStatValue(statistics.avgScorePar5, format: "%.2f"))
-                        Divider().padding(.vertical, 4)
-                        StatItemView(label: "Avg Putts Par 3", value: formatStatValue(statistics.avgPuttsPar3, format: "%.2f"))
-                        StatItemView(label: "Avg Putts Par 4", value: formatStatValue(statistics.avgPuttsPar4, format: "%.2f"))
-                        StatItemView(label: "Avg Putts Par 5", value: formatStatValue(statistics.avgPuttsPar5, format: "%.2f"))
-                        Divider().padding(.vertical, 4)
-                         StatItemView(label: "GIR % Par 3", value: formatStatValue(statistics.girPercentagePar3, format: "%.1f%%"))
-                    }
+                StatSectionView(title: "Putting Breakdown", backgroundColor: Theme.surface) {
+                    StatItemView(label: "Avg Putts on GIR", value: formatStatValue(statistics.avgPuttsOnGIR, format: "%.2f"))
+                    StatItemView(label: "Avg Putts Off GIR", value: formatStatValue(statistics.avgPuttsOffGIR, format: "%.2f"))
+                    Theme.divider.padding(.vertical, Theme.spacingXXS)
+                    StatItemView(label: "1-Putt %", value: formatStatValue(statistics.onePuttPercentage, format: "%.1f%%"))
+                    StatItemView(label: "3-Putt+ %", value: formatStatValue(statistics.threePuttPercentage, format: "%.1f%%"))
+                }
 
-                    StatSectionView(title: "Putting Breakdown", backgroundColor: cardBackgroundColor) {
-                        StatItemView(label: "Avg Putts on GIR", value: formatStatValue(statistics.avgPuttsOnGIR, format: "%.2f"))
-                        StatItemView(label: "Avg Putts Off GIR", value: formatStatValue(statistics.avgPuttsOffGIR, format: "%.2f"))
-                        Divider().padding(.vertical, 4)
-                        StatItemView(label: "1-Putt %", value: formatStatValue(statistics.onePuttPercentage, format: "%.1f%%"))
-                        StatItemView(label: "3-Putt+ %", value: formatStatValue(statistics.threePuttPercentage, format: "%.1f%%"))
-                    }
+                StatSectionView(title: "Driving Accuracy", backgroundColor: Theme.surface) {
+                    StatItemView(label: "Fairways Hit %", value: formatStatValue(statistics.fairwaysHitPercentageTotal, format: "%.1f%%"))
+                     StatItemView(label: "Missed Left %", value: formatStatValue(statistics.fairwaysMissedLeftPercentage, format: "%.1f%%"))
+                     StatItemView(label: "Missed Right %", value: formatStatValue(statistics.fairwaysMissedRightPercentage, format: "%.1f%%"))
+                     Theme.divider.padding(.vertical, Theme.spacingXXS)
+                     StatItemView(label: "Total Opportunities", value: "\(statistics.totalFairwayOpportunities)")
+                }
 
-                    StatSectionView(title: "Driving Accuracy", backgroundColor: cardBackgroundColor) {
-                        StatItemView(label: "Fairways Hit %", value: formatStatValue(statistics.fairwaysHitPercentageTotal, format: "%.1f%%"))
-                         StatItemView(label: "Missed Left %", value: formatStatValue(statistics.fairwaysMissedLeftPercentage, format: "%.1f%%"))
-                         StatItemView(label: "Missed Right %", value: formatStatValue(statistics.fairwaysMissedRightPercentage, format: "%.1f%%"))
-                         StatItemView(label: "Total Opportunities", value: "\(statistics.totalFairwayOpportunities)")
-                    }
+                StatSectionView(title: "Strokes Gained (vs Benchmark)", backgroundColor: Theme.surface) {
+                    StatItemView(label: "Total", value: formatStrokesGained(statistics.strokesGainedTotal))
+                    StatItemView(label: "Off The Tee", value: formatStrokesGained(statistics.strokesGainedOffTheTee))
+                    StatItemView(label: "Approach", value: formatStrokesGained(statistics.strokesGainedApproach))
+                    StatItemView(label: "Around Green", value: formatStrokesGained(statistics.strokesGainedAroundGreen))
+                    StatItemView(label: "Putting", value: formatStrokesGained(statistics.strokesGainedPutting))
+                    Text("Note: Strokes Gained requires benchmark data and detailed shot tracking for accurate calculation.")
+                         .font(Theme.fontCaption) // Use Theme font
+                         .foregroundColor(Theme.textSecondary) // Use Theme color
+                         .padding(.top, Theme.spacingXS) // Use Theme spacing
+                         .fixedSize(horizontal: false, vertical: true) // Allow text wrap
+                }
 
-                    StatSectionView(title: "Strokes Gained (vs Benchmark)", backgroundColor: cardBackgroundColor) {
-                        StatItemView(label: "Total", value: formatStrokesGained(statistics.strokesGainedTotal))
-                        StatItemView(label: "Off The Tee", value: formatStrokesGained(statistics.strokesGainedOffTheTee))
-                        StatItemView(label: "Approach", value: formatStrokesGained(statistics.strokesGainedApproach))
-                        StatItemView(label: "Around Green", value: formatStrokesGained(statistics.strokesGainedAroundGreen))
-                        StatItemView(label: "Putting", value: formatStrokesGained(statistics.strokesGainedPutting))
-                        Text("Note: Strokes Gained requires benchmark data and detailed shot tracking for accurate calculation.")
-                             .font(.caption)
-                             .foregroundColor(.secondary)
-                             .padding(.top, 5)
-                             .fixedSize(horizontal: false, vertical: true) // Allow text wrap
-                    }
-
-                } // End Main VStack
-                .padding(.vertical)
-            } // End ScrollView
-            .background(backgroundColor.ignoresSafeArea()) // Apply background to ScrollView
-            .navigationTitle("Statistics")
-            .onAppear {
-                 logger.info("StatsView appeared.")
-                 // Statistics are passed in, no need to load here
-            }
+            } // End Main VStack
+            .padding(.vertical) // Overall vertical padding for scroll content
+        } // End ScrollView
+        .background(Theme.background.ignoresSafeArea()) // Apply Theme background to ScrollView
+        .navigationTitle("Statistics")
+        .onAppear {
+             logger.info("StatsView appeared.")
         }
-        .navigationViewStyle(.stack) // Use stack style for standard behavior
     }
 
     // MARK: - Extracted Chart Section
+    // ... (trendChartSection remains unchanged from the previous themed version) ...
     private var trendChartSection: some View {
-         VStack(spacing: 20) {
-             // Pass the correct data and closures to the generic chart function
+         VStack(spacing: Theme.spacingM) { // Use Theme spacing between charts
+             // Pass data and accessors to the generic chart function
              trendChart(
                  title: "Score Trend (vs Par)",
-                 data: statistics.roundsWithScoreByDate, // Use data with relative score
+                 data: statistics.roundsWithScoreByDate,
                  dateProvider: { $0.date },
-                 valueProvider: { Double($0.scoreRelativeToPar) } // Access the relative score
+                 valueProvider: { Double($0.scoreRelativeToPar) }, // Use relative score
+                 lineColor: Theme.accentSecondary // Use Blue for score trend
              )
-             .frame(height: 200)
-             .chartYAxisLabel("Score vs Par")
+             .frame(height: 200) // Keep fixed height
+             .chartYAxisLabel("Score vs Par", alignment: .center) // Add Y axis label
 
              trendChart(
                  title: "Putts per Round Trend",
                  data: statistics.roundsWithPuttsByDate,
                  dateProvider: { $0.date },
-                 valueProvider: { Double($0.putts) }
+                 valueProvider: { Double($0.putts) },
+                 lineColor: Theme.negative // Use Red for putts (lower is better)
              )
              .frame(height: 200)
-             .chartYAxisLabel("Total Putts")
+             .chartYAxisLabel("Total Putts", alignment: .center)
 
              trendChart(
                  title: "GIR % Trend",
                  data: statistics.roundsWithGIRByDate,
                  dateProvider: { $0.date },
-                 valueProvider: { $0.percentage }
+                 valueProvider: { $0.percentage },
+                 lineColor: Theme.positive // Use Green for GIR (higher is better)
              )
              .frame(height: 200)
-             .chartYScale(domain: 0...100)
-             .chartYAxisLabel("GIR %")
+             .chartYScale(domain: 0...100) // Keep scale 0-100 for percentages
+             .chartYAxisLabel("GIR %", alignment: .center)
 
              trendChart(
                  title: "Fairway % Trend",
                  data: statistics.roundsWithFairwaysByDate,
                  dateProvider: { $0.date },
-                 valueProvider: { $0.percentage }
+                 valueProvider: { $0.percentage },
+                 lineColor: Theme.warning // Use Orange for Fairways
              )
              .frame(height: 200)
               .chartYScale(domain: 0...100)
-              .chartYAxisLabel("Fairway %")
+              .chartYAxisLabel("Fairway %", alignment: .center)
          }
-         .padding(.horizontal) // Apply padding around the VStack containing charts
+         .padding(.horizontal, Theme.spacingM) // Padding around the chart group
     }
 
-
     // MARK: - Reusable Trend Chart Component
+    // ... (trendChart function remains unchanged from the previous themed version) ...
     private func trendChart<T: Identifiable>(
         title: String,
         data: [T],
-        dateProvider: @escaping (T) -> Date, // Closure to get Date for X-axis
-        valueProvider: @escaping (T) -> Double // Closure to get Double for Y-axis
+        dateProvider: @escaping (T) -> Date,
+        valueProvider: @escaping (T) -> Double,
+        lineColor: Color // Pass in line color
     ) -> some View {
-        VStack(alignment: .leading) {
-            Text(title).font(.headline)
+        VStack(alignment: .leading, spacing: Theme.spacingXS) { // Add spacing
+            Text(title).font(Theme.fontHeadline) // Use Theme font
 
-            // Handle empty data case for charts
+            // Handle empty data case
             if data.isEmpty {
                  Text("No data available for this chart.")
-                     .font(.caption)
-                     .foregroundColor(.secondary)
-                     .frame(height: 200) // Match chart height
+                     .font(Theme.fontCaption) // Use Theme font
+                     .foregroundColor(Theme.textSecondary) // Use Theme color
+                     .frame(height: 200, alignment: .center) // Match chart height and center text
                      .frame(maxWidth: .infinity)
-                     .background(cardBackgroundColor)
-                     .cornerRadius(12)
+                     .background(Theme.surface) // Use Theme surface
+                     .cornerRadius(Theme.cornerRadiusM) // Use Theme radius
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    Chart {
-                        ForEach(data) { item in
-                            let date = dateProvider(item)
-                            let value = valueProvider(item)
+                Chart {
+                    ForEach(data) { item in
+                        let date = dateProvider(item)
+                        let value = valueProvider(item)
 
-                            LineMark(x: .value("Date", date), y: .value("Value", value))
-                                .foregroundStyle(primaryColor)
-                                .interpolationMethod(.catmullRom)
+                        // Line Mark - Use specified line color
+                        LineMark(
+                            x: .value("Date", date),
+                            y: .value("Value", value)
+                        )
+                        .foregroundStyle(lineColor) // Apply Theme color
+                        .interpolationMethod(.catmullRom) // Smooth line
 
-                            PointMark(x: .value("Date", date), y: .value("Value", value))
-                                .foregroundStyle(primaryColor)
-                                .symbolSize(CGSize(width: 5, height: 5))
-                        }
+                        // Point Mark - Use specified line color
+                        PointMark(
+                            x: .value("Date", date),
+                            y: .value("Value", value)
+                        )
+                        .foregroundStyle(lineColor) // Apply Theme color
+                        .symbolSize(CGSize(width: 6, height: 6)) // Slightly larger points
                     }
-                    .chartXAxis {
-                         AxisMarks(values: .automatic(desiredCount: data.count > 10 ? 10 : 5)) { value in
-                             AxisGridLine()
-                             AxisTick()
-                             AxisValueLabel(format: .dateTime.month().day())
-                         }
+                }
+                // Customize X Axis (Date)
+                .chartXAxis {
+                     AxisMarks(values: .automatic(desiredCount: data.count > 10 ? 8 : 5)) { value in
+                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 3])) // Dashed grid line
+                            .foregroundStyle(Theme.divider.opacity(0.5))
+                         AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
+                            .foregroundStyle(Theme.divider)
+                         AxisValueLabel(format: .dateTime.month(.abbreviated).day(), // Concise date format
+                                        orientation: .vertical, // Orient labels vertically if needed
+                                        verticalSpacing: Theme.spacingXS)
+                            .font(Theme.fontCaption2) // Use Theme font
+                            .foregroundStyle(Theme.textSecondary) // Use Theme color
                      }
-                     .chartYAxis {
-                         AxisMarks { value in
-                             AxisGridLine()
-                             AxisTick()
-                             AxisValueLabel() // Default formatting
-                         }
+                 }
+                 // Customize Y Axis (Value)
+                 .chartYAxis {
+                     AxisMarks { value in
+                         AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 3]))
+                            .foregroundStyle(Theme.divider.opacity(0.5))
+                         AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
+                            .foregroundStyle(Theme.divider)
+                         AxisValueLabel() // Default formatting for value
+                            .font(Theme.fontCaption2) // Use Theme font
+                            .foregroundStyle(Theme.textSecondary) // Use Theme color
                      }
-                    .frame(minWidth: max(300, CGFloat(data.count * 30))) // Ensure minimum scrollable width
-                } // End ScrollView
+                 }
+                 // Add horizontal scroll for dense data
+                 .chartScrollableAxes(.horizontal)
+                 .chartXVisibleDomain(length: calculateXDomainLength(dataCount: data.count)) // Show recent N items initially
+                 .frame(minWidth: 300) // Ensure minimum width if not scrollable
             }
         }
-        .padding()
-        .background(cardBackgroundColor)
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 5, y: 2)
+        .padding(Theme.spacingM) // Padding inside the card
+        .background(Theme.surface) // Use Theme surface
+        .cornerRadius(Theme.cornerRadiusM) // Use Theme radius
+        .modifier(Theme.subtleShadow) // Use Theme shadow
     }
 
-    // MARK: - Helper Functions for Formatting
+
+    private func calculateXDomainLength(dataCount: Int) -> Int {
+        let desiredVisibleCount = 12
+        return min(dataCount, desiredVisibleCount)
+    }
+
+    // MARK: - Helper Functions for Formatting (Ensure returns exist)
 
     // Helper to format optional Strokes Gained values
     private func formatStrokesGained(_ value: Double?) -> String {
         guard let value = value, value.isFinite else { return "N/A" }
+        // --- FIXED: Added return ---
         return String(format: "%+.2f", value)
     }
 
     // Helper to format regular stat values, handling potential NaN/Infinite
      private func formatStatValue(_ value: Double, format: String) -> String {
          guard value.isFinite else { return "N/A" }
+         // --- FIXED: Added return ---
          return String(format: format, value)
      }
 }
 
 
 // MARK: - Reusable Stat Section View Component
+// ... (StatSectionView remains unchanged from the previous themed version) ...
 struct StatSectionView<Content: View>: View {
     let title: String
-    let backgroundColor: Color
+    let backgroundColor: Color // Passed in (e.g., Theme.surface)
     @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.headline).padding(.horizontal).padding(.top, 8)
-             VStack(alignment: .leading, spacing: 0) { content }
-             .padding(.horizontal).padding(.bottom, 8)
+        VStack(alignment: .leading, spacing: Theme.spacingXS) { // Use Theme spacing
+            Text(title)
+                .font(Theme.fontHeadline) // Use Theme font
+                .foregroundColor(Theme.textPrimary) // Use Theme color
+                .padding(.horizontal, Theme.spacingM) // Use Theme spacing
+                .padding(.top, Theme.spacingS) // Use Theme spacing
+
+             VStack(alignment: .leading, spacing: 0) { // No spacing between items in the list
+                 content
+             }
+             .padding(.horizontal, Theme.spacingM) // Horizontal padding for content
+             .padding(.bottom, Theme.spacingS) // Bottom padding for content
         }
-        .background(backgroundColor).cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 5, y: 2)
-        .padding(.horizontal)
+        .background(backgroundColor) // Use passed background color
+        .cornerRadius(Theme.cornerRadiusM) // Use Theme radius
+        .modifier(Theme.subtleShadow) // Use Theme shadow
+        .padding(.horizontal, Theme.spacingM) // Padding outside the section card
     }
 }
 
 // MARK: - Reusable Stat Item View Component
+// ... (StatItemView remains unchanged from the previous themed version) ...
 struct StatItemView: View {
     let label: String
     let value: String
 
     var body: some View {
          HStack {
-            Text(label).font(.subheadline).foregroundColor(.secondary).lineLimit(1)
+            Text(label)
+                .font(Theme.fontSubheadline) // Use Theme font
+                .foregroundColor(Theme.textSecondary) // Use Theme color
+                .lineLimit(1)
             Spacer()
-            Text(value).font(.subheadline).fontWeight(.semibold).foregroundColor(Color(hex:"252C34"))
+            Text(value)
+                .font(Theme.fontBodySemibold) // Use Theme font (slightly bolder value)
+                .foregroundColor(Theme.textPrimary) // Use Theme color
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, Theme.spacingXS) // Use Theme spacing for vertical padding
     }
 }
 
@@ -258,26 +299,11 @@ struct StatItemView: View {
 #if DEBUG
 struct StatsView_Previews: PreviewProvider {
     static var previews: some View {
-        let sampleStats: Statistics = {
-            var stats = Statistics()
-            let calc = StatisticsCalculator()
-            stats = calc.calculateStatistics(from: SampleData.sampleRounds)
-             let now = Date()
-             // Ensure DateScorePair includes relative score for preview
-             stats.roundsWithScoreByDate = [
-                 DateScorePair(date: now.addingTimeInterval(-86400*14), score: 85, scoreRelativeToPar: 13),
-                 DateScorePair(date: now.addingTimeInterval(-86400*10), score: 88, scoreRelativeToPar: 16),
-                 DateScorePair(date: now.addingTimeInterval(-86400*7), score: 82, scoreRelativeToPar: 10),
-                 DateScorePair(date: now.addingTimeInterval(-86400*3), score: 84, scoreRelativeToPar: 12),
-                 DateScorePair(date: now.addingTimeInterval(-86400*1), score: 79, scoreRelativeToPar: 7)
-             ]
-             stats.roundsWithPuttsByDate = [ DatePuttsPair(date: now.addingTimeInterval(-86400*14), putts: 34), DatePuttsPair(date: now.addingTimeInterval(-86400*10), putts: 36), DatePuttsPair(date: now.addingTimeInterval(-86400*7), putts: 31), DatePuttsPair(date: now.addingTimeInterval(-86400*3), putts: 33), DatePuttsPair(date: now.addingTimeInterval(-86400*1), putts: 30) ]
-             stats.roundsWithGIRByDate = [ DatePercentPair(date: now.addingTimeInterval(-86400*14), percentage: 50.0), DatePercentPair(date: now.addingTimeInterval(-86400*7), percentage: 61.1), DatePercentPair(date: now.addingTimeInterval(-86400*1), percentage: 72.2) ]
-             stats.roundsWithFairwaysByDate = [ DatePercentPair(date: now.addingTimeInterval(-86400*14), percentage: 64.3), DatePercentPair(date: now.addingTimeInterval(-86400*7), percentage: 71.4), DatePercentPair(date: now.addingTimeInterval(-86400*1), percentage: 78.6) ]
-            return stats
-        }()
-        StatsView(statistics: sampleStats)
+        let sampleStats = StatisticsCalculator().calculateStatistics(from: SampleData.sampleRounds)
+        NavigationView {
+            StatsView(statistics: sampleStats)
+        }
     }
 }
 #endif
-
+// --- END OF FILE GolfTracker.swiftpm/Sources/Views/StatsView.swift ---

@@ -119,11 +119,13 @@ class DataManager: ObservableObject {
 
     func deleteRound(withId id: UUID) {
         logger.info("Requesting deletion for round: \(id)")
-        if rounds.removeAll(where: { $0.id == id }) != nil {
+        let initialCount = rounds.count
+        rounds.removeAll(where: { $0.id == id })
+        if rounds.count < initialCount { // Check if the count decreased
             logger.info("Round \(id) removed from memory.")
             Task { await saveChanges() } // Trigger async save
         } else {
-            logger.warning("Attempted to delete round (\(id)) but it was not found in memory.")
+            logger.warning("Attempted to delete round (\(id)) but it was not found in memory (count did not change).")
         }
     }
 }

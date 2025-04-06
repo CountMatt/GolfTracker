@@ -1,3 +1,7 @@
+// --- START OF FILE GolfTracker.swiftpm/Sources/Models/Statistics.swift ---
+// No changes needed in Statistics.swift as it's a data model.
+// Keep the existing Statistics.swift code.
+
 // File: Sources/Models/Statistics.swift
 import Foundation
 
@@ -72,3 +76,4 @@ struct Statistics: Codable {
     var totalPar5sPlayed: Int = 0
     var totalFairwayOpportunities: Int = 0
 }
+// --- END OF FILE GolfTracker.swiftpm/Sources/Models/Statistics.swift ---
